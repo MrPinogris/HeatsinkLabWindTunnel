@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Read ESP32 serial output and log parsed telemetry lines to CSV."""
 
 from __future__ import annotations

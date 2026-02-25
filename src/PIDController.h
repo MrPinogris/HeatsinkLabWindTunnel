@@ -15,6 +15,8 @@ public:
 
     void reset();
     float calculate(float setpoint, float measured);
+    void setTunings(float kp_, float ki_, float kd_);
+    void getTunings(float &kp_, float &ki_, float &kd_) const;
 };
 
 #endif

@@ -26,3 +26,15 @@ float PIDController::calculate(float setpoint, float measured) {
     float output = kp * error + ki * integral + kd * derivative;
     return constrain(output, 0.0f, 255.0f);
 }
+
+void PIDController::setTunings(float kp_, float ki_, float kd_) {
+    kp = kp_;
+    ki = ki_;
+    kd = kd_;
+}
+
+void PIDController::getTunings(float &kp_, float &ki_, float &kd_) const {
+    kp_ = kp;
+    ki_ = ki;
+    kd_ = kd;
+}

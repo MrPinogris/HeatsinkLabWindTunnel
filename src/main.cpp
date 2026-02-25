@@ -2,9 +2,10 @@
 #include "max6675.h"
 #include "PIDController.h"
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 // ---------------- PIN DEFINITIES ----------------
-// Kies veilige GPIO's voor jouw ESP32-S3 board!
 const int heaterMosfetPin = 9;
 
 const int thermocoupleSCK = 10;
@@ -13,19 +14,22 @@ const int thermocoupleSO  = 12;
 
 // ---------------- PWM INSTELLINGEN ----------------
 const int pwmChannel = 0;
-const int pwmFreq = 500;      // 20 kHz (goed voor MOSFET)
-const int pwmResolution = 8;    // 8-bit (0–255)
+const int pwmFreq = 500;
+const int pwmResolution = 8;
 
 // ---------------- OBJECTEN ----------------
 MAX6675 thermocouple(thermocoupleSCK, thermocoupleCS, thermocoupleSO);
-PIDController pid(12.0, 0.6, 0.0);   // kp, ki, kd
+float pidKp = 12.0f;
+float pidKi = 0.6f;
+float pidKd = 0.0f;
+PIDController pid(pidKp, pidKi, pidKd);
 
 // ---------------- CONTROL TIMING (millis) ----------------
-const uint32_t controlPeriodMs = 500;   // MAX6675 ~4Hz => >= 250ms
+const uint32_t controlPeriodMs = 500;
 uint32_t lastControlMs = 0;
 
 // ---------------- SETPOINT ----------------
-const float setpoint = 70.0;
+float setpoint = 70.0f;
 
 // ---------------- FUNCTIES ----------------
 void setPWM(int duty)
@@ -39,18 +43,16 @@ float lastGoodTemp = NAN;
 
 bool isValidTemp(float t) {
   if (isnan(t)) return false;
-  if (t < -20 || t > 400) return false;   // plausibel bereik
+  if (t < -20 || t > 400) return false;
   return true;
 }
 
-float readTempFiltered(float t) { 
-
+float readTempFiltered(float t) {
   if (!isValidTemp(t)) return NAN;
 
   if (!isnan(lastGoodTemp)) {
-    float maxJump = 100.0; // °C per sample (bij 300ms loop)
+    float maxJump = 100.0f;
     if (fabs(t - lastGoodTemp) > maxJump) {
-      // glitch -> negeer
       return lastGoodTemp;
     }
   }
@@ -61,16 +63,17 @@ float readTempFiltered(float t) {
 
 // -------- EMA smoothing --------
 float emaTemp = NAN;
-const float alpha = 0.25; // 0..1 (lager = meer smoothing)
+float emaAlpha = 0.25f;
 
 float smoothTemp(float t) {
   if (isnan(emaTemp)) emaTemp = t;
-  emaTemp = alpha * t + (1.0f - alpha) * emaTemp;
+  emaTemp = emaAlpha * t + (1.0f - emaAlpha) * emaTemp;
   return emaTemp;
 }
 
 // -------- PWM slew-rate limit --------
 int lastPWM = 0;
+int maxPwmStep = 15;
 
 int limitPWMChange(int pwm, int maxStep) {
   if (pwm > lastPWM + maxStep) pwm = lastPWM + maxStep;
@@ -82,8 +85,8 @@ int limitPWMChange(int pwm, int maxStep) {
 // -------- Stuck watchdog --------
 float lastTempForStuck = NAN;
 uint16_t sameCount = 0;
-const float stuckEpsilon = 0.01f;   // “exact gelijk” drempel
-const uint16_t stuckLimit = 30;     // 30 samples * 300ms = 9s stuck
+const float stuckEpsilon = 0.01f;
+const uint16_t stuckLimit = 30;
 
 bool stuckDetected(float t) {
   if (isnan(lastTempForStuck)) {
@@ -102,12 +105,125 @@ bool stuckDetected(float t) {
   return (sameCount >= stuckLimit);
 }
 
+// -------- Runtime commands over serial --------
+const size_t commandBufferSize = 96;
+char commandBuffer[commandBufferSize];
+size_t commandLen = 0;
+
+void printConfig() {
+  float kp;
+  float ki;
+  float kd;
+  pid.getTunings(kp, ki, kd);
+  Serial.printf("CFG KP: %.3f | KI: %.3f | KD: %.3f | SP: %.2f | ALPHA: %.3f | MAXSTEP: %d\n",
+                kp, ki, kd, setpoint, emaAlpha, maxPwmStep);
+}
+
+void applyPidTunings() {
+  pid.setTunings(pidKp, pidKi, pidKd);
+  pid.reset();
+}
+
+void handleCommand(char *line) {
+  while (*line == ' ' || *line == '\t') {
+    line++;
+  }
+
+  if (*line == '\0') {
+    return;
+  }
+
+  if (strcmp(line, "GET") == 0) {
+    printConfig();
+    return;
+  }
+
+  char *command = strtok(line, " \t");
+  if (!command || strcmp(command, "SET") != 0) {
+    Serial.println("ERR Unknown command. Use SET <KP|KI|KD|SP|ALPHA|MAXSTEP> <value> or GET");
+    return;
+  }
+
+  char *key = strtok(NULL, " \t");
+  char *valueText = strtok(NULL, " \t");
+  if (!key || !valueText) {
+    Serial.println("ERR Usage: SET <KP|KI|KD|SP|ALPHA|MAXSTEP> <value>");
+    return;
+  }
+
+  if (strcmp(key, "MAXSTEP") == 0) {
+    int valueInt = atoi(valueText);
+    if (valueInt < 0 || valueInt > 255) {
+      Serial.println("ERR MAXSTEP must be in range 0..255");
+      return;
+    }
+    maxPwmStep = valueInt;
+    Serial.printf("OK MAXSTEP set to %d\n", maxPwmStep);
+    printConfig();
+    return;
+  }
+
+  float value = atof(valueText);
+  if (strcmp(key, "KP") == 0) {
+    pidKp = value;
+    applyPidTunings();
+    Serial.printf("OK KP set to %.3f\n", pidKp);
+  } else if (strcmp(key, "KI") == 0) {
+    pidKi = value;
+    applyPidTunings();
+    Serial.printf("OK KI set to %.3f\n", pidKi);
+  } else if (strcmp(key, "KD") == 0) {
+    pidKd = value;
+    applyPidTunings();
+    Serial.printf("OK KD set to %.3f\n", pidKd);
+  } else if (strcmp(key, "SP") == 0) {
+    if (value < -20.0f || value > 400.0f) {
+      Serial.println("ERR SP must be in range -20..400");
+      return;
+    }
+    setpoint = value;
+    Serial.printf("OK SP set to %.2f\n", setpoint);
+  } else if (strcmp(key, "ALPHA") == 0) {
+    if (value <= 0.0f || value > 1.0f) {
+      Serial.println("ERR ALPHA must be in range (0..1]");
+      return;
+    }
+    emaAlpha = value;
+    Serial.printf("OK ALPHA set to %.3f\n", emaAlpha);
+  } else {
+    Serial.println("ERR Unknown key. Use KP, KI, KD, SP, ALPHA, MAXSTEP");
+    return;
+  }
+
+  printConfig();
+}
+
+void processSerialCommands() {
+  while (Serial.available() > 0) {
+    char c = (char)Serial.read();
+    if (c == '\r') {
+      continue;
+    }
+    if (c == '\n') {
+      commandBuffer[commandLen] = '\0';
+      handleCommand(commandBuffer);
+      commandLen = 0;
+      continue;
+    }
+    if (commandLen < (commandBufferSize - 1)) {
+      commandBuffer[commandLen++] = c;
+    } else {
+      commandLen = 0;
+      Serial.println("ERR Command too long");
+    }
+  }
+}
+
 void setup()
 {
   Serial.begin(115200);
   delay(500);
 
-  // PWM initialiseren
   ledcSetup(pwmChannel, pwmFreq, pwmResolution);
   ledcAttachPin(heaterMosfetPin, pwmChannel);
 
@@ -115,19 +231,21 @@ void setup()
   pid.reset();
 
   Serial.println("System started");
+  Serial.println("Commands: GET, SET KP <v>, SET KI <v>, SET KD <v>, SET SP <v>, SET ALPHA <v>, SET MAXSTEP <v>");
+  printConfig();
 }
 
 void loop() {
-  
+  processSerialCommands();
 
-  // --- millis-based control loop ---
   uint32_t now = millis();
   if ((now - lastControlMs) < controlPeriodMs) {
-    return; // nog niet tijd om opnieuw te regelen
+    return;
   }
   lastControlMs = now;
+
   float rawTemp = thermocouple.readCelsius();
-  float t = readTempFiltered(rawTemp);     // glitch reject
+  float t = readTempFiltered(rawTemp);
   if (isnan(t)) {
     setPWM(0);
     pid.reset();
@@ -135,24 +253,22 @@ void loop() {
     return;
   }
 
-  // stuck watchdog op de (gefilterde) raw value
   if (stuckDetected(t)) {
     setPWM(0);
     pid.reset();
     Serial.println("Thermocouple STUCK detected -> heater OFF + PID reset");
-    // korte cooldown zodat je niet 1000x dezelfde melding krijgt
     delay(500);
     sameCount = 0;
     return;
   }
 
-  float t_smooth = smoothTemp(t);   // EMA smoothing
+  float tSmooth = smoothTemp(t);
 
-  int pwm = (int)pid.calculate(setpoint, t_smooth);
-  pwm = limitPWMChange(pwm, 15);    // max 15 counts per loop
+  int pwm = (int)pid.calculate(setpoint, tSmooth);
+  pwm = limitPWMChange(pwm, maxPwmStep);
 
   setPWM(pwm);
 
-  Serial.printf("Rawtemp %.2f °C | Temp: %.2f °C | Smooth: %.2f °C | PWM: %d | SP: %.2f\n",
-                rawTemp, t, t_smooth, pwm, setpoint);
+  Serial.printf("Rawtemp %.2f C | Temp: %.2f C | Smooth: %.2f C | PWM: %d | SP: %.2f\n",
+                rawTemp, t, tSmooth, pwm, setpoint);
 }
