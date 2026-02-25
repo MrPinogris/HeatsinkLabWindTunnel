@@ -1,26 +1,42 @@
-﻿# HeatsinkLab Tools
+# HeatsinkLab Tools
 
 ## Dependencies
 
-Install Python dependency once:
+Install Python dependencies once:
 
 ```powershell
-pip install pyserial
+pip install pyserial matplotlib
 ```
 
-## 1) PID Tuning GUI
+## 1) PID Tuning GUI + Live Graph
 
-Use this to change controller values live while the ESP32 is running.
+Run:
 
 ```powershell
 python tools/pid_gui.py
 ```
 
+Features:
+- Connect to COM port and tune `KP`, `KI`, `KD`, `SP`, `ALPHA`, `MAXSTEP`
+- Live telemetry display
+- Live graph with toggleable series:
+  - Raw Temp
+  - Temp
+  - Smooth
+  - SP
+  - PWM
+- Rolling window mode or full history mode
+- Adjustable rolling window length (seconds)
+- Adjustable retained history points
+- History scroll slider for viewing older data
+- Auto-scroll toggle to follow newest data or stay on historical view
+- Zoom/pan/back/home controls using the matplotlib toolbar
+- Scrollable full GUI layout for smaller monitors
+
 In the GUI:
-- Select COM port
-- Connect
-- Use `Get From ESP32` to read current values
-- Change values and click `Set ...` or `Apply All`
+- Use `Get From ESP32` to read current firmware values
+- Use `Apply All` or individual `Set ...` buttons
+- Use `Apply View` after changing plot settings
 
 ## 2) Serial to CSV Logger
 
@@ -41,7 +57,7 @@ python tools/serial_to_csv.py --port COM5 --output logs/my_run.csv
 
 ## Firmware serial commands
 
-The ESP32 now supports:
+The ESP32 supports:
 
 - `GET`
 - `SET KP <value>`
