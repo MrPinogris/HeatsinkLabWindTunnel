@@ -7,13 +7,15 @@
 
 // ---------------- PIN DEFINITIES ----------------
 const int heaterMosfetPin = 9;
+const int fanPwmPin = 8;
 
-const int thermocoupleSCK = 10;
+const int thermocoupleSCK = 12;
 const int thermocoupleCS  = 11;
-const int thermocoupleSO  = 12;
+const int thermocoupleSO  = 10;
 
 // ---------------- PWM INSTELLINGEN ----------------
-const int pwmChannel = 0;
+const int heaterPwmChannel = 0;
+const int fanPwmChannel = 1;
 const int pwmFreq = 500;
 const int pwmResolution = 8;
 
@@ -30,12 +32,26 @@ uint32_t lastControlMs = 0;
 
 // ---------------- SETPOINT ----------------
 float setpoint = 70.0f;
+float fanSpeedPercent = 0.0f;
+int fanPwmRaw = 255;
 
 // ---------------- FUNCTIES ----------------
 void setPWM(int duty)
 {
   duty = constrain(duty, 0, 255);
-  ledcWrite(pwmChannel, duty);
+  ledcWrite(heaterPwmChannel, duty);
+}
+
+int fanPercentToRaw(float percent) {
+  float clamped = constrain(percent, 0.0f, 100.0f);
+  int raw = (int)lroundf(255.0f * (1.0f - (clamped / 100.0f)));
+  return constrain(raw, 0, 255);
+}
+
+void setFanSpeedPercent(float percent) {
+  fanSpeedPercent = constrain(percent, 0.0f, 100.0f);
+  fanPwmRaw = fanPercentToRaw(fanSpeedPercent);
+  ledcWrite(fanPwmChannel, fanPwmRaw);
 }
 
 // -------- Glitch reject --------
@@ -115,8 +131,8 @@ void printConfig() {
   float ki;
   float kd;
   pid.getTunings(kp, ki, kd);
-  Serial.printf("CFG KP: %.3f | KI: %.3f | KD: %.3f | SP: %.2f | ALPHA: %.3f | MAXSTEP: %d\n",
-                kp, ki, kd, setpoint, emaAlpha, maxPwmStep);
+  Serial.printf("CFG KP: %.3f | KI: %.3f | KD: %.3f | SP: %.2f | ALPHA: %.3f | MAXSTEP: %d | FAN: %.1f\n",
+                kp, ki, kd, setpoint, emaAlpha, maxPwmStep, fanSpeedPercent);
 }
 
 void applyPidTunings() {
@@ -140,14 +156,14 @@ void handleCommand(char *line) {
 
   char *command = strtok(line, " \t");
   if (!command || strcmp(command, "SET") != 0) {
-    Serial.println("ERR Unknown command. Use SET <KP|KI|KD|SP|ALPHA|MAXSTEP> <value> or GET");
+    Serial.println("ERR Unknown command. Use SET <KP|KI|KD|SP|ALPHA|MAXSTEP|FAN> <value> or GET");
     return;
   }
 
   char *key = strtok(NULL, " \t");
   char *valueText = strtok(NULL, " \t");
   if (!key || !valueText) {
-    Serial.println("ERR Usage: SET <KP|KI|KD|SP|ALPHA|MAXSTEP> <value>");
+    Serial.println("ERR Usage: SET <KP|KI|KD|SP|ALPHA|MAXSTEP|FAN> <value>");
     return;
   }
 
@@ -190,8 +206,15 @@ void handleCommand(char *line) {
     }
     emaAlpha = value;
     Serial.printf("OK ALPHA set to %.3f\n", emaAlpha);
+  } else if (strcmp(key, "FAN") == 0) {
+    if (value < 0.0f || value > 100.0f) {
+      Serial.println("ERR FAN must be in range 0..100 (percent)");
+      return;
+    }
+    setFanSpeedPercent(value);
+    Serial.printf("OK FAN set to %.1f %% (raw %d, 255=off 0=full)\n", fanSpeedPercent, fanPwmRaw);
   } else {
-    Serial.println("ERR Unknown key. Use KP, KI, KD, SP, ALPHA, MAXSTEP");
+    Serial.println("ERR Unknown key. Use KP, KI, KD, SP, ALPHA, MAXSTEP, FAN");
     return;
   }
 
@@ -224,14 +247,17 @@ void setup()
   Serial.begin(115200);
   delay(500);
 
-  ledcSetup(pwmChannel, pwmFreq, pwmResolution);
-  ledcAttachPin(heaterMosfetPin, pwmChannel);
+  ledcSetup(heaterPwmChannel, pwmFreq, pwmResolution);
+  ledcAttachPin(heaterMosfetPin, heaterPwmChannel);
+  ledcSetup(fanPwmChannel, pwmFreq, pwmResolution);
+  ledcAttachPin(fanPwmPin, fanPwmChannel);
 
   setPWM(0);
+  setFanSpeedPercent(0.0f);
   pid.reset();
 
   Serial.println("System started");
-  Serial.println("Commands: GET, SET KP <v>, SET KI <v>, SET KD <v>, SET SP <v>, SET ALPHA <v>, SET MAXSTEP <v>");
+  Serial.println("Commands: GET, SET KP <v>, SET KI <v>, SET KD <v>, SET SP <v>, SET ALPHA <v>, SET MAXSTEP <v>, SET FAN <0..100>");
   printConfig();
 }
 
@@ -269,6 +295,6 @@ void loop() {
 
   setPWM(pwm);
 
-  Serial.printf("Rawtemp %.2f C | Temp: %.2f C | Smooth: %.2f C | PWM: %d | SP: %.2f\n",
-                rawTemp, t, tSmooth, pwm, setpoint);
+  Serial.printf("Rawtemp %.2f C | Temp: %.2f C | Smooth: %.2f C | PWM: %d | SP: %.2f | FAN: %.1f | FANPWM: %d\n",
+                rawTemp, t, tSmooth, pwm, setpoint, fanSpeedPercent, fanPwmRaw);
 }

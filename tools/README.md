@@ -17,14 +17,16 @@ python tools/pid_gui.py
 ```
 
 Features:
-- Connect to COM port and tune `KP`, `KI`, `KD`, `SP`, `ALPHA`, `MAXSTEP`
+- Connect to COM port and tune `KP`, `KI`, `KD`, `SP`, `ALPHA`, `MAXSTEP`, `FAN`
 - Live telemetry display
+- Fan control with reversed hardware logic (`255=off`, `0=full`) wrapped as user `FAN` percent (`0=off`, `100=full`)
 - Live graph with toggleable series:
   - Raw Temp
   - Temp
   - Smooth
   - SP
   - PWM
+  - Fan PWM
 - Rolling window mode or full history mode
 - Adjustable rolling window length (seconds)
 - Adjustable retained history points
@@ -66,6 +68,7 @@ The ESP32 supports:
 - `SET SP <value>`
 - `SET ALPHA <value>`
 - `SET MAXSTEP <value>`
+- `SET FAN <value>`
 
 Example:
 
@@ -74,6 +77,7 @@ SET KP 10.0
 SET KI 0.8
 SET KD 0.1
 SET SP 75
+SET FAN 40
 GET
 ```
 

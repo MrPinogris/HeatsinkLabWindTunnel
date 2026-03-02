@@ -23,7 +23,9 @@ TELEMETRY_RE = re.compile(
     r"Temp:\s*([-+]?\d*\.?\d+)\D+"
     r"Smooth:\s*([-+]?\d*\.?\d+)\D+"
     r"PWM:\s*([-+]?\d+)\D+"
-    r"SP:\s*([-+]?\d*\.?\d+)"
+    r"SP:\s*([-+]?\d*\.?\d+)\D+"
+    r"FAN:\s*([-+]?\d*\.?\d+)\D+"
+    r"FANPWM:\s*([-+]?\d+)"
 )
 
 
@@ -73,6 +75,8 @@ def main() -> int:
         "temp_smooth_c",
         "pwm",
         "setpoint_c",
+        "fan_speed_pct",
+        "fan_pwm_raw",
     ]
     ensure_header(output_path, fieldnames)
 
@@ -106,6 +110,8 @@ def main() -> int:
                     "temp_smooth_c": float(match.group(3)),
                     "pwm": int(match.group(4)),
                     "setpoint_c": float(match.group(5)),
+                    "fan_speed_pct": float(match.group(6)),
+                    "fan_pwm_raw": int(match.group(7)),
                 }
                 writer.writerow(row)
                 f.flush()
@@ -115,7 +121,9 @@ def main() -> int:
                     f"{rows_written:>6} | "
                     f"T={row['temp_filtered_c']:.2f} C "
                     f"Smooth={row['temp_smooth_c']:.2f} C "
-                    f"PWM={row['pwm']}"
+                    f"PWM={row['pwm']} "
+                    f"Fan={row['fan_speed_pct']:.1f}% "
+                    f"FanPWM={row['fan_pwm_raw']}"
                 )
 
     except KeyboardInterrupt:

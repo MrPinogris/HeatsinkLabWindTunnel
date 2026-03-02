@@ -27,7 +27,9 @@ TELEMETRY_RE = re.compile(
     r"Temp:\s*([-+]?\d*\.?\d+)\D+"
     r"Smooth:\s*([-+]?\d*\.?\d+)\D+"
     r"PWM:\s*([-+]?\d+)\D+"
-    r"SP:\s*([-+]?\d*\.?\d+)"
+    r"SP:\s*([-+]?\d*\.?\d+)\D+"
+    r"FAN:\s*([-+]?\d*\.?\d+)\D+"
+    r"FANPWM:\s*([-+]?\d+)"
 )
 CFG_RE = re.compile(
     r"CFG\s+KP:\s*([-+]?\d*\.?\d+)\s*\|\s*"
@@ -35,7 +37,8 @@ CFG_RE = re.compile(
     r"KD:\s*([-+]?\d*\.?\d+)\s*\|\s*"
     r"SP:\s*([-+]?\d*\.?\d+)\s*\|\s*"
     r"ALPHA:\s*([-+]?\d*\.?\d+)\s*\|\s*"
-    r"MAXSTEP:\s*([-+]?\d+)"
+    r"MAXSTEP:\s*([-+]?\d+)\s*\|\s*"
+    r"FAN:\s*([-+]?\d*\.?\d+)"
 )
 
 
@@ -60,18 +63,22 @@ class PIDGui:
         self.sp_var = tk.StringVar(value="70.0")
         self.alpha_var = tk.StringVar(value="0.25")
         self.maxstep_var = tk.StringVar(value="15")
+        self.fan_var = tk.StringVar(value="0")
 
         self.raw_temp_var = tk.StringVar(value="-")
         self.temp_var = tk.StringVar(value="-")
         self.smooth_var = tk.StringVar(value="-")
         self.sp_live_var = tk.StringVar(value="-")
         self.pwm_var = tk.StringVar(value="-")
+        self.fan_speed_var = tk.StringVar(value="-")
+        self.fan_pwm_var = tk.StringVar(value="-")
 
         self.show_raw_var = tk.BooleanVar(value=True)
         self.show_temp_var = tk.BooleanVar(value=True)
         self.show_smooth_var = tk.BooleanVar(value=True)
         self.show_sp_var = tk.BooleanVar(value=True)
         self.show_pwm_var = tk.BooleanVar(value=True)
+        self.show_fan_pwm_var = tk.BooleanVar(value=False)
 
         self.mode_var = tk.StringVar(value="rolling")
         self.auto_scroll_var = tk.BooleanVar(value=True)
@@ -85,6 +92,7 @@ class PIDGui:
         self.smooth_values: list[float] = []
         self.sp_values: list[float] = []
         self.pwm_values: list[float] = []
+        self.fan_pwm_values: list[float] = []
 
         self.plot_dirty = False
 
@@ -141,9 +149,10 @@ class PIDGui:
         self._param_row(param_frame, 3, "SP", self.sp_var)
         self._param_row(param_frame, 4, "ALPHA", self.alpha_var)
         self._param_row(param_frame, 5, "MAXSTEP", self.maxstep_var)
+        self._param_row(param_frame, 6, "FAN", self.fan_var)
 
         param_buttons = ttk.Frame(param_frame)
-        param_buttons.grid(row=6, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        param_buttons.grid(row=7, column=0, columnspan=3, sticky="w", pady=(8, 0))
         ttk.Button(param_buttons, text="Apply All", command=self._apply_all).pack(side="left", padx=(0, 8))
         ttk.Button(param_buttons, text="Get From ESP32", command=self._request_get).pack(side="left")
 
@@ -155,6 +164,8 @@ class PIDGui:
         self._live_row(live, 2, "Smoothed Temp [C]", self.smooth_var)
         self._live_row(live, 3, "Setpoint [C]", self.sp_live_var)
         self._live_row(live, 4, "PWM", self.pwm_var)
+        self._live_row(live, 5, "Fan Speed [%]", self.fan_speed_var)
+        self._live_row(live, 6, "Fan PWM Raw", self.fan_pwm_var)
 
         plot_controls = ttk.LabelFrame(self.content, text="Plot Controls", padding=10)
         plot_controls.pack(fill="x", pady=(0, 8))
@@ -167,6 +178,7 @@ class PIDGui:
         ttk.Checkbutton(series_frame, text="Smooth", variable=self.show_smooth_var, command=self._mark_plot_dirty).pack(anchor="w")
         ttk.Checkbutton(series_frame, text="SP", variable=self.show_sp_var, command=self._mark_plot_dirty).pack(anchor="w")
         ttk.Checkbutton(series_frame, text="PWM", variable=self.show_pwm_var, command=self._mark_plot_dirty).pack(anchor="w")
+        ttk.Checkbutton(series_frame, text="Fan PWM", variable=self.show_fan_pwm_var, command=self._mark_plot_dirty).pack(anchor="w")
 
         mode_frame = ttk.Frame(plot_controls)
         mode_frame.grid(row=0, column=1, padx=(0, 20), sticky="nw")
@@ -323,6 +335,7 @@ class PIDGui:
         self._set_param("SP", self.sp_var)
         self._set_param("ALPHA", self.alpha_var)
         self._set_param("MAXSTEP", self.maxstep_var)
+        self._set_param("FAN", self.fan_var)
 
     def _request_get(self) -> None:
         self._send_command("GET")
@@ -368,12 +381,16 @@ class PIDGui:
             smooth = float(telemetry.group(3))
             pwm = float(telemetry.group(4))
             sp = float(telemetry.group(5))
+            fan_speed = float(telemetry.group(6))
+            fan_pwm = float(telemetry.group(7))
 
             self.raw_temp_var.set(f"{raw:.2f}")
             self.temp_var.set(f"{temp:.2f}")
             self.smooth_var.set(f"{smooth:.2f}")
             self.sp_live_var.set(f"{sp:.2f}")
             self.pwm_var.set(f"{pwm:.0f}")
+            self.fan_speed_var.set(f"{fan_speed:.1f}")
+            self.fan_pwm_var.set(f"{fan_pwm:.0f}")
 
             next_t = 0.0 if not self.times else self.times[-1] + 0.5
             self.times.append(next_t)
@@ -382,6 +399,7 @@ class PIDGui:
             self.smooth_values.append(smooth)
             self.sp_values.append(sp)
             self.pwm_values.append(pwm)
+            self.fan_pwm_values.append(fan_pwm)
 
             self._trim_history()
             self._sync_offset_scale()
@@ -396,6 +414,7 @@ class PIDGui:
             self.sp_var.set(cfg.group(4))
             self.alpha_var.set(cfg.group(5))
             self.maxstep_var.set(cfg.group(6))
+            self.fan_var.set(cfg.group(7))
 
     def _append_log(self, text: str) -> None:
         self.log_text.insert("end", text + "\n")
@@ -430,6 +449,7 @@ class PIDGui:
         self.smooth_values.clear()
         self.sp_values.clear()
         self.pwm_values.clear()
+        self.fan_pwm_values.clear()
         self.offset_var.set(0.0)
         self._sync_offset_scale()
         self._mark_plot_dirty()
@@ -451,6 +471,7 @@ class PIDGui:
         del self.smooth_values[:drop]
         del self.sp_values[:drop]
         del self.pwm_values[:drop]
+        del self.fan_pwm_values[:drop]
 
     def _sync_offset_scale(self) -> None:
         if len(self.times) < 2:
@@ -493,6 +514,7 @@ class PIDGui:
         smooth = self.smooth_values
         sp = self.sp_values
         pwm = self.pwm_values
+        fan_pwm = self.fan_pwm_values
 
         x_min, x_max = t[0], t[-1]
         mode = self.mode_var.get()
@@ -523,6 +545,8 @@ class PIDGui:
             self.ax_temp.plot(t, sp, color="#9467bd", linewidth=1.2, linestyle="--", label="SP")
         if self.show_pwm_var.get():
             self.ax_pwm.plot(t, pwm, color="#ff7f0e", linewidth=1.2, label="PWM")
+        if self.show_fan_pwm_var.get():
+            self.ax_pwm.plot(t, fan_pwm, color="#17becf", linewidth=1.2, linestyle="--", label="Fan PWM")
 
         self.ax_temp.set_xlabel("Time [s]")
         self.ax_temp.set_ylabel("Temperature [C]")
