@@ -23,7 +23,10 @@ TELEMETRY_RE = re.compile(
     r"Temp:\s*([-+]?\d*\.?\d+)\D+"
     r"Smooth:\s*([-+]?\d*\.?\d+)\D+"
     r"PWM:\s*([-+]?\d+)\D+"
+    r"(?:BIAS:\s*([-+]?\d*\.?\d+)\D+)?"
+    r"(?:SPBIAS:\s*([-+]?\d*\.?\d+)\D+)?"
     r"SP:\s*([-+]?\d*\.?\d+)\D+"
+    r"(?:EFFSP:\s*([-+]?\d*\.?\d+)\D+)?"
     r"FAN:\s*([-+]?\d*\.?\d+)\D+"
     r"FANPWM:\s*([-+]?\d+)"
 )
@@ -74,7 +77,10 @@ def main() -> int:
         "temp_filtered_c",
         "temp_smooth_c",
         "pwm",
+        "pid_bias",
+        "setpoint_bias_c",
         "setpoint_c",
+        "effective_setpoint_c",
         "fan_speed_pct",
         "fan_pwm_raw",
     ]
@@ -109,9 +115,12 @@ def main() -> int:
                     "temp_filtered_c": float(match.group(2)),
                     "temp_smooth_c": float(match.group(3)),
                     "pwm": int(match.group(4)),
-                    "setpoint_c": float(match.group(5)),
-                    "fan_speed_pct": float(match.group(6)),
-                    "fan_pwm_raw": int(match.group(7)),
+                    "pid_bias": float(match.group(5) or 0.0),
+                    "setpoint_bias_c": float(match.group(6) or 0.0),
+                    "setpoint_c": float(match.group(7)),
+                    "effective_setpoint_c": float(match.group(8) or (float(match.group(7)) + float(match.group(6) or 0.0))),
+                    "fan_speed_pct": float(match.group(9)),
+                    "fan_pwm_raw": int(match.group(10)),
                 }
                 writer.writerow(row)
                 f.flush()
@@ -122,6 +131,8 @@ def main() -> int:
                     f"T={row['temp_filtered_c']:.2f} C "
                     f"Smooth={row['temp_smooth_c']:.2f} C "
                     f"PWM={row['pwm']} "
+                    f"Bias={row['pid_bias']:.2f} "
+                    f"SPBias={row['setpoint_bias_c']:.2f} "
                     f"Fan={row['fan_speed_pct']:.1f}% "
                     f"FanPWM={row['fan_pwm_raw']}"
                 )

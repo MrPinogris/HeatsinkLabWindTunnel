@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import json
 import queue
 import re
 import threading
 import tkinter as tk
+import time
+from pathlib import Path
 from tkinter import messagebox, ttk
 
 import serial
@@ -27,7 +30,10 @@ TELEMETRY_RE = re.compile(
     r"Temp:\s*([-+]?\d*\.?\d+)\D+"
     r"Smooth:\s*([-+]?\d*\.?\d+)\D+"
     r"PWM:\s*([-+]?\d+)\D+"
+    r"(?:BIAS:\s*([-+]?\d*\.?\d+)\D+)?"
+    r"(?:SPBIAS:\s*([-+]?\d*\.?\d+)\D+)?"
     r"SP:\s*([-+]?\d*\.?\d+)\D+"
+    r"(?:EFFSP:\s*([-+]?\d*\.?\d+)\D+)?"
     r"FAN:\s*([-+]?\d*\.?\d+)\D+"
     r"FANPWM:\s*([-+]?\d+)"
 )
@@ -35,6 +41,8 @@ CFG_RE = re.compile(
     r"CFG\s+KP:\s*([-+]?\d*\.?\d+)\s*\|\s*"
     r"KI:\s*([-+]?\d*\.?\d+)\s*\|\s*"
     r"KD:\s*([-+]?\d*\.?\d+)\s*\|\s*"
+    r"BIAS:\s*([-+]?\d*\.?\d+)\s*\|\s*"
+    r"SPBIAS:\s*([-+]?\d*\.?\d+)\s*\|\s*"
     r"SP:\s*([-+]?\d*\.?\d+)\s*\|\s*"
     r"ALPHA:\s*([-+]?\d*\.?\d+)\s*\|\s*"
     r"MAXSTEP:\s*([-+]?\d+)\s*\|\s*"
@@ -52,23 +60,32 @@ class PIDGui:
         self.reader_thread: threading.Thread | None = None
         self.reader_stop = threading.Event()
         self.msg_queue: queue.Queue[tuple[str, str]] = queue.Queue()
+        self.max_queue_items = 2000
+        self.max_log_lines = 1500
+        self.state_path = Path(__file__).with_name("pid_gui_state.json")
+        self.saved_state = self._load_state()
 
         self.port_var = tk.StringVar()
         self.baud_var = tk.StringVar(value="115200")
         self.status_var = tk.StringVar(value="Disconnected")
 
-        self.kp_var = tk.StringVar(value="12.0")
-        self.ki_var = tk.StringVar(value="0.6")
-        self.kd_var = tk.StringVar(value="0.0")
-        self.sp_var = tk.StringVar(value="70.0")
-        self.alpha_var = tk.StringVar(value="0.25")
-        self.maxstep_var = tk.StringVar(value="15")
-        self.fan_var = tk.StringVar(value="0")
+        self.kp_var = tk.StringVar(value=self._state_value("kp", "8.0"))
+        self.ki_var = tk.StringVar(value=self._state_value("ki", "0.06"))
+        self.kd_var = tk.StringVar(value=self._state_value("kd", "0.0"))
+        self.bias_var = tk.StringVar(value=self._state_value("bias", "0.0"))
+        self.spbias_var = tk.StringVar(value=self._state_value("spbias", "0.0"))
+        self.sp_var = tk.StringVar(value=self._state_value("sp", "70.0"))
+        self.alpha_var = tk.StringVar(value=self._state_value("alpha", "0.25"))
+        self.maxstep_var = tk.StringVar(value=self._state_value("maxstep", "15"))
+        self.fan_var = tk.StringVar(value=self._state_value("fan", "0"))
 
         self.raw_temp_var = tk.StringVar(value="-")
         self.temp_var = tk.StringVar(value="-")
         self.smooth_var = tk.StringVar(value="-")
+        self.bias_live_var = tk.StringVar(value="-")
+        self.spbias_live_var = tk.StringVar(value="-")
         self.sp_live_var = tk.StringVar(value="-")
+        self.effsp_live_var = tk.StringVar(value="-")
         self.pwm_var = tk.StringVar(value="-")
         self.fan_speed_var = tk.StringVar(value="-")
         self.fan_pwm_var = tk.StringVar(value="-")
@@ -95,6 +112,9 @@ class PIDGui:
         self.fan_pwm_values: list[float] = []
 
         self.plot_dirty = False
+        self.awaiting_handshake = False
+        self.handshake_deadline = 0.0
+        self.handshake_ok = False
 
         self._build_ui()
         self._refresh_ports()
@@ -102,7 +122,40 @@ class PIDGui:
 
         self.root.after(100, self._drain_queue)
         self.root.after(250, self._refresh_plot_if_needed)
+        self.root.after(300, self._check_handshake)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _state_value(self, key: str, default: str) -> str:
+        value = self.saved_state.get(key, default)
+        return str(value)
+
+    def _load_state(self) -> dict[str, str]:
+        if not self.state_path.exists():
+            return {}
+        try:
+            data = json.loads(self.state_path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return {str(k): str(v) for k, v in data.items()}
+        except (OSError, json.JSONDecodeError):
+            pass
+        return {}
+
+    def _save_state(self) -> None:
+        state = {
+            "kp": self.kp_var.get().strip(),
+            "ki": self.ki_var.get().strip(),
+            "kd": self.kd_var.get().strip(),
+            "bias": self.bias_var.get().strip(),
+            "spbias": self.spbias_var.get().strip(),
+            "sp": self.sp_var.get().strip(),
+            "alpha": self.alpha_var.get().strip(),
+            "maxstep": self.maxstep_var.get().strip(),
+            "fan": self.fan_var.get().strip(),
+        }
+        try:
+            self.state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        except OSError:
+            pass
 
     def _build_ui(self) -> None:
         outer = ttk.Frame(self.root)
@@ -146,13 +199,15 @@ class PIDGui:
         self._param_row(param_frame, 0, "KP", self.kp_var)
         self._param_row(param_frame, 1, "KI", self.ki_var)
         self._param_row(param_frame, 2, "KD", self.kd_var)
-        self._param_row(param_frame, 3, "SP", self.sp_var)
-        self._param_row(param_frame, 4, "ALPHA", self.alpha_var)
-        self._param_row(param_frame, 5, "MAXSTEP", self.maxstep_var)
-        self._param_row(param_frame, 6, "FAN", self.fan_var)
+        self._param_row(param_frame, 3, "BIAS", self.bias_var)
+        self._param_row(param_frame, 4, "SPBIAS", self.spbias_var)
+        self._param_row(param_frame, 5, "SP", self.sp_var)
+        self._param_row(param_frame, 6, "ALPHA", self.alpha_var)
+        self._param_row(param_frame, 7, "MAXSTEP", self.maxstep_var)
+        self._param_row(param_frame, 8, "FAN", self.fan_var)
 
         param_buttons = ttk.Frame(param_frame)
-        param_buttons.grid(row=7, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        param_buttons.grid(row=9, column=0, columnspan=3, sticky="w", pady=(8, 0))
         ttk.Button(param_buttons, text="Apply All", command=self._apply_all).pack(side="left", padx=(0, 8))
         ttk.Button(param_buttons, text="Get From ESP32", command=self._request_get).pack(side="left")
 
@@ -162,10 +217,13 @@ class PIDGui:
         self._live_row(live, 0, "Raw Temp [C]", self.raw_temp_var)
         self._live_row(live, 1, "Filtered Temp [C]", self.temp_var)
         self._live_row(live, 2, "Smoothed Temp [C]", self.smooth_var)
-        self._live_row(live, 3, "Setpoint [C]", self.sp_live_var)
-        self._live_row(live, 4, "PWM", self.pwm_var)
-        self._live_row(live, 5, "Fan Speed [%]", self.fan_speed_var)
-        self._live_row(live, 6, "Fan PWM Raw", self.fan_pwm_var)
+        self._live_row(live, 3, "Bias", self.bias_live_var)
+        self._live_row(live, 4, "SP Bias [C]", self.spbias_live_var)
+        self._live_row(live, 5, "Setpoint [C]", self.sp_live_var)
+        self._live_row(live, 6, "Effective SP [C]", self.effsp_live_var)
+        self._live_row(live, 7, "PWM", self.pwm_var)
+        self._live_row(live, 8, "Fan Speed [%]", self.fan_speed_var)
+        self._live_row(live, 9, "Fan PWM Raw", self.fan_pwm_var)
 
         plot_controls = ttk.LabelFrame(self.content, text="Plot Controls", padding=10)
         plot_controls.pack(fill="x", pady=(0, 8))
@@ -288,6 +346,9 @@ class PIDGui:
             self.reader_thread.start()
             self.status_var.set(f"Connected: {port} @ {baud}")
             self._append_log(f"Connected to {port} @ {baud}")
+            self.awaiting_handshake = True
+            self.handshake_ok = False
+            self.handshake_deadline = time.monotonic() + 2.5
             self._request_get()
         except (ValueError, SerialException) as exc:
             self.serial_conn = None
@@ -301,10 +362,13 @@ class PIDGui:
             except SerialException:
                 pass
         self.serial_conn = None
+        self.awaiting_handshake = False
+        self.handshake_ok = False
         self.status_var.set("Disconnected")
         self._append_log("Disconnected")
 
     def _on_close(self) -> None:
+        self._save_state()
         self._disconnect()
         self.main_canvas.unbind_all("<MouseWheel>")
         self.main_canvas.unbind_all("<Shift-MouseWheel>")
@@ -326,12 +390,15 @@ class PIDGui:
         if not value:
             messagebox.showerror("Missing Value", f"Enter a value for {key}.")
             return
+        self._save_state()
         self._send_command(f"SET {key} {value}")
 
     def _apply_all(self) -> None:
         self._set_param("KP", self.kp_var)
         self._set_param("KI", self.ki_var)
         self._set_param("KD", self.kd_var)
+        self._set_param("BIAS", self.bias_var)
+        self._set_param("SPBIAS", self.spbias_var)
         self._set_param("SP", self.sp_var)
         self._set_param("ALPHA", self.alpha_var)
         self._set_param("MAXSTEP", self.maxstep_var)
@@ -354,12 +421,17 @@ class PIDGui:
             if not line:
                 continue
 
-            self.msg_queue.put(("line", line))
+            if self.msg_queue.qsize() < self.max_queue_items:
+                self.msg_queue.put(("line", line))
+            elif self.msg_queue.qsize() == self.max_queue_items:
+                self.msg_queue.put(("log", "Warning: input flood detected, dropping lines to keep UI responsive."))
 
     def _drain_queue(self) -> None:
         try:
-            while True:
+            processed = 0
+            while processed < 300:
                 kind, payload = self.msg_queue.get_nowait()
+                processed += 1
                 if kind == "disconnect":
                     self._disconnect()
                     continue
@@ -373,6 +445,9 @@ class PIDGui:
 
     def _handle_line(self, line: str) -> None:
         self._append_log(line)
+        if line.startswith("CFG ") or line.startswith("Rawtemp "):
+            self.handshake_ok = True
+            self.awaiting_handshake = False
 
         telemetry = TELEMETRY_RE.search(line)
         if telemetry:
@@ -380,14 +455,20 @@ class PIDGui:
             temp = float(telemetry.group(2))
             smooth = float(telemetry.group(3))
             pwm = float(telemetry.group(4))
-            sp = float(telemetry.group(5))
-            fan_speed = float(telemetry.group(6))
-            fan_pwm = float(telemetry.group(7))
+            bias = float(telemetry.group(5) or 0.0)
+            spbias = float(telemetry.group(6) or 0.0)
+            sp = float(telemetry.group(7))
+            effsp = float(telemetry.group(8) or sp + spbias)
+            fan_speed = float(telemetry.group(9))
+            fan_pwm = float(telemetry.group(10))
 
             self.raw_temp_var.set(f"{raw:.2f}")
             self.temp_var.set(f"{temp:.2f}")
             self.smooth_var.set(f"{smooth:.2f}")
+            self.bias_live_var.set(f"{bias:.2f}")
+            self.spbias_live_var.set(f"{spbias:.2f}")
             self.sp_live_var.set(f"{sp:.2f}")
+            self.effsp_live_var.set(f"{effsp:.2f}")
             self.pwm_var.set(f"{pwm:.0f}")
             self.fan_speed_var.set(f"{fan_speed:.1f}")
             self.fan_pwm_var.set(f"{fan_pwm:.0f}")
@@ -411,14 +492,31 @@ class PIDGui:
             self.kp_var.set(cfg.group(1))
             self.ki_var.set(cfg.group(2))
             self.kd_var.set(cfg.group(3))
-            self.sp_var.set(cfg.group(4))
-            self.alpha_var.set(cfg.group(5))
-            self.maxstep_var.set(cfg.group(6))
-            self.fan_var.set(cfg.group(7))
+            self.bias_var.set(cfg.group(4))
+            self.spbias_var.set(cfg.group(5))
+            self.sp_var.set(cfg.group(6))
+            self.alpha_var.set(cfg.group(7))
+            self.maxstep_var.set(cfg.group(8))
+            self.fan_var.set(cfg.group(9))
+            self._save_state()
 
     def _append_log(self, text: str) -> None:
         self.log_text.insert("end", text + "\n")
+        line_count = int(self.log_text.index("end-1c").split(".")[0])
+        if line_count > self.max_log_lines:
+            remove_until = line_count - self.max_log_lines
+            self.log_text.delete("1.0", f"{remove_until + 1}.0")
         self.log_text.see("end")
+
+    def _check_handshake(self) -> None:
+        if self.awaiting_handshake and time.monotonic() > self.handshake_deadline:
+            self._append_log("No valid HeatsinkLab telemetry detected on this port.")
+            messagebox.showwarning(
+                "Wrong Port",
+                "Connected port does not look like the ESP32 controller.\nSelect another COM port.",
+            )
+            self._disconnect()
+        self.root.after(300, self._check_handshake)
 
     def _mark_plot_dirty(self) -> None:
         self.plot_dirty = True

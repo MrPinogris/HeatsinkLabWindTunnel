@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "max6675.h"
 #include "PIDController.h"
+#include <Preferences.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,10 +22,13 @@ const int pwmResolution = 8;
 
 // ---------------- OBJECTEN ----------------
 MAX6675 thermocouple(thermocoupleSCK, thermocoupleCS, thermocoupleSO);
-float pidKp = 12.0f;
-float pidKi = 0.6f;
+float pidKp = 8.0f;
+float pidKi = 0.06f;
 float pidKd = 0.0f;
+float pidBias = 0.0f;
+float setpointBias = 0.0f;
 PIDController pid(pidKp, pidKi, pidKd);
+Preferences preferences;
 
 // ---------------- CONTROL TIMING (millis) ----------------
 const uint32_t controlPeriodMs = 500;
@@ -34,6 +38,11 @@ uint32_t lastControlMs = 0;
 float setpoint = 70.0f;
 float fanSpeedPercent = 0.0f;
 int fanPwmRaw = 255;
+float emaAlpha = 0.25f;
+int maxPwmStep = 15;
+
+void saveConfigToNvs();
+void loadConfigFromNvs();
 
 // ---------------- FUNCTIES ----------------
 void setPWM(int duty)
@@ -52,6 +61,30 @@ void setFanSpeedPercent(float percent) {
   fanSpeedPercent = constrain(percent, 0.0f, 100.0f);
   fanPwmRaw = fanPercentToRaw(fanSpeedPercent);
   ledcWrite(fanPwmChannel, fanPwmRaw);
+}
+
+void saveConfigToNvs() {
+  preferences.putFloat("kp", pidKp);
+  preferences.putFloat("ki", pidKi);
+  preferences.putFloat("kd", pidKd);
+  preferences.putFloat("bias", pidBias);
+  preferences.putFloat("spbias", setpointBias);
+  preferences.putFloat("sp", setpoint);
+  preferences.putFloat("alpha", emaAlpha);
+  preferences.putInt("maxstep", maxPwmStep);
+  preferences.putFloat("fanpct", fanSpeedPercent);
+}
+
+void loadConfigFromNvs() {
+  pidKp = preferences.getFloat("kp", pidKp);
+  pidKi = preferences.getFloat("ki", pidKi);
+  pidKd = preferences.getFloat("kd", pidKd);
+  pidBias = constrain(preferences.getFloat("bias", pidBias), -255.0f, 255.0f);
+  setpointBias = constrain(preferences.getFloat("spbias", setpointBias), -200.0f, 200.0f);
+  setpoint = constrain(preferences.getFloat("sp", setpoint), -20.0f, 400.0f);
+  emaAlpha = constrain(preferences.getFloat("alpha", emaAlpha), 0.001f, 1.0f);
+  maxPwmStep = constrain(preferences.getInt("maxstep", maxPwmStep), 0, 255);
+  fanSpeedPercent = constrain(preferences.getFloat("fanpct", fanSpeedPercent), 0.0f, 100.0f);
 }
 
 // -------- Glitch reject --------
@@ -79,7 +112,6 @@ float readTempFiltered(float t) {
 
 // -------- EMA smoothing --------
 float emaTemp = NAN;
-float emaAlpha = 0.25f;
 
 float smoothTemp(float t) {
   if (isnan(emaTemp)) emaTemp = t;
@@ -89,7 +121,6 @@ float smoothTemp(float t) {
 
 // -------- PWM slew-rate limit --------
 int lastPWM = 0;
-int maxPwmStep = 15;
 
 int limitPWMChange(int pwm, int maxStep) {
   if (pwm > lastPWM + maxStep) pwm = lastPWM + maxStep;
@@ -131,12 +162,13 @@ void printConfig() {
   float ki;
   float kd;
   pid.getTunings(kp, ki, kd);
-  Serial.printf("CFG KP: %.3f | KI: %.3f | KD: %.3f | SP: %.2f | ALPHA: %.3f | MAXSTEP: %d | FAN: %.1f\n",
-                kp, ki, kd, setpoint, emaAlpha, maxPwmStep, fanSpeedPercent);
+  Serial.printf("CFG KP: %.3f | KI: %.3f | KD: %.3f | BIAS: %.2f | SPBIAS: %.2f | SP: %.2f | ALPHA: %.3f | MAXSTEP: %d | FAN: %.1f\n",
+                kp, ki, kd, pid.getBias(), setpointBias, setpoint, emaAlpha, maxPwmStep, fanSpeedPercent);
 }
 
 void applyPidTunings() {
   pid.setTunings(pidKp, pidKi, pidKd);
+  pid.setBias(pidBias);
   pid.reset();
 }
 
@@ -156,14 +188,14 @@ void handleCommand(char *line) {
 
   char *command = strtok(line, " \t");
   if (!command || strcmp(command, "SET") != 0) {
-    Serial.println("ERR Unknown command. Use SET <KP|KI|KD|SP|ALPHA|MAXSTEP|FAN> <value> or GET");
+    Serial.println("ERR Unknown command. Use SET <KP|KI|KD|BIAS|SPBIAS|SP|ALPHA|MAXSTEP|FAN> <value> or GET");
     return;
   }
 
   char *key = strtok(NULL, " \t");
   char *valueText = strtok(NULL, " \t");
   if (!key || !valueText) {
-    Serial.println("ERR Usage: SET <KP|KI|KD|SP|ALPHA|MAXSTEP|FAN> <value>");
+    Serial.println("ERR Usage: SET <KP|KI|KD|BIAS|SPBIAS|SP|ALPHA|MAXSTEP|FAN> <value>");
     return;
   }
 
@@ -175,6 +207,7 @@ void handleCommand(char *line) {
     }
     maxPwmStep = valueInt;
     Serial.printf("OK MAXSTEP set to %d\n", maxPwmStep);
+    saveConfigToNvs();
     printConfig();
     return;
   }
@@ -192,6 +225,21 @@ void handleCommand(char *line) {
     pidKd = value;
     applyPidTunings();
     Serial.printf("OK KD set to %.3f\n", pidKd);
+  } else if (strcmp(key, "BIAS") == 0) {
+    if (value < -255.0f || value > 255.0f) {
+      Serial.println("ERR BIAS must be in range -255..255");
+      return;
+    }
+    pidBias = value;
+    applyPidTunings();
+    Serial.printf("OK BIAS set to %.2f\n", pidBias);
+  } else if (strcmp(key, "SPBIAS") == 0) {
+    if (value < -200.0f || value > 200.0f) {
+      Serial.println("ERR SPBIAS must be in range -200..200");
+      return;
+    }
+    setpointBias = value;
+    Serial.printf("OK SPBIAS set to %.2f\n", setpointBias);
   } else if (strcmp(key, "SP") == 0) {
     if (value < -20.0f || value > 400.0f) {
       Serial.println("ERR SP must be in range -20..400");
@@ -214,10 +262,11 @@ void handleCommand(char *line) {
     setFanSpeedPercent(value);
     Serial.printf("OK FAN set to %.1f %% (raw %d, 255=off 0=full)\n", fanSpeedPercent, fanPwmRaw);
   } else {
-    Serial.println("ERR Unknown key. Use KP, KI, KD, SP, ALPHA, MAXSTEP, FAN");
+    Serial.println("ERR Unknown key. Use KP, KI, KD, BIAS, SPBIAS, SP, ALPHA, MAXSTEP, FAN");
     return;
   }
 
+  saveConfigToNvs();
   printConfig();
 }
 
@@ -246,6 +295,8 @@ void setup()
 {
   Serial.begin(115200);
   delay(500);
+  preferences.begin("heatctl", false);
+  loadConfigFromNvs();
 
   ledcSetup(heaterPwmChannel, pwmFreq, pwmResolution);
   ledcAttachPin(heaterMosfetPin, heaterPwmChannel);
@@ -253,11 +304,13 @@ void setup()
   ledcAttachPin(fanPwmPin, fanPwmChannel);
 
   setPWM(0);
-  setFanSpeedPercent(0.0f);
+  setFanSpeedPercent(fanSpeedPercent);
+  pid.setBias(pidBias);
+  pid.setTunings(pidKp, pidKi, pidKd);
   pid.reset();
 
   Serial.println("System started");
-  Serial.println("Commands: GET, SET KP <v>, SET KI <v>, SET KD <v>, SET SP <v>, SET ALPHA <v>, SET MAXSTEP <v>, SET FAN <0..100>");
+  Serial.println("Commands: GET, SET KP <v>, SET KI <v>, SET KD <v>, SET BIAS <v>, SET SPBIAS <v>, SET SP <v>, SET ALPHA <v>, SET MAXSTEP <v>, SET FAN <0..100>");
   printConfig();
 }
 
@@ -289,12 +342,14 @@ void loop() {
   }
 
   float tSmooth = smoothTemp(t);
+  float effectiveSetpoint = setpoint + setpointBias;
+  effectiveSetpoint = constrain(effectiveSetpoint, -20.0f, 400.0f);
 
-  int pwm = (int)pid.calculate(setpoint, tSmooth);
+  int pwm = (int)pid.calculate(effectiveSetpoint, tSmooth);
   pwm = limitPWMChange(pwm, maxPwmStep);
 
   setPWM(pwm);
 
-  Serial.printf("Rawtemp %.2f C | Temp: %.2f C | Smooth: %.2f C | PWM: %d | SP: %.2f | FAN: %.1f | FANPWM: %d\n",
-                rawTemp, t, tSmooth, pwm, setpoint, fanSpeedPercent, fanPwmRaw);
+  Serial.printf("Rawtemp %.2f C | Temp: %.2f C | Smooth: %.2f C | PWM: %d | BIAS: %.2f | SPBIAS: %.2f | SP: %.2f | EFFSP: %.2f | FAN: %.1f | FANPWM: %d\n",
+                rawTemp, t, tSmooth, pwm, pidBias, setpointBias, setpoint, effectiveSetpoint, fanSpeedPercent, fanPwmRaw);
 }

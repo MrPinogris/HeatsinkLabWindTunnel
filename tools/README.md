@@ -17,7 +17,10 @@ python tools/pid_gui.py
 ```
 
 Features:
-- Connect to COM port and tune `KP`, `KI`, `KD`, `SP`, `ALPHA`, `MAXSTEP`, `FAN`
+- Connect to COM port and tune `KP`, `KI`, `KD`, `BIAS`, `SPBIAS`, `SP`, `ALPHA`, `MAXSTEP`, `FAN`
+- `BIAS` is output-bias, `SPBIAS` is setpoint-bias
+- ESP32 persists those settings in NVS, so values survive reset/power-cycle
+- GUI remembers the last parameter values between restarts (`tools/pid_gui_state.json`)
 - Live telemetry display
 - Fan control with reversed hardware logic (`255=off`, `0=full`) wrapped as user `FAN` percent (`0=off`, `100=full`)
 - Live graph with toggleable series:
@@ -65,6 +68,8 @@ The ESP32 supports:
 - `SET KP <value>`
 - `SET KI <value>`
 - `SET KD <value>`
+- `SET BIAS <value>`
+- `SET SPBIAS <value>`
 - `SET SP <value>`
 - `SET ALPHA <value>`
 - `SET MAXSTEP <value>`
@@ -76,6 +81,8 @@ Example:
 SET KP 10.0
 SET KI 0.8
 SET KD 0.1
+SET BIAS 18
+SET SPBIAS -2.5
 SET SP 75
 SET FAN 40
 GET

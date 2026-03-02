@@ -6,6 +6,7 @@
 class PIDController {
 private:
     float kp, ki, kd;
+    float bias;
     float integral;
     float lastError;
     unsigned long lastTime;
@@ -17,6 +18,8 @@ public:
     float calculate(float setpoint, float measured);
     void setTunings(float kp_, float ki_, float kd_);
     void getTunings(float &kp_, float &ki_, float &kd_) const;
+    void setBias(float bias_);
+    float getBias() const;
 };
 
 #endif

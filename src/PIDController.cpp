@@ -1,7 +1,7 @@
 #include "PIDController.h"
 
 PIDController::PIDController(float kp_, float ki_, float kd_)
-    : kp(kp_), ki(ki_), kd(kd_), integral(0.0f), lastError(0.0f), lastTime(0) {}
+    : kp(kp_), ki(ki_), kd(kd_), bias(0.0f), integral(0.0f), lastError(0.0f), lastTime(0) {}
 
 void PIDController::reset() {
     integral = 0.0f;
@@ -23,7 +23,7 @@ float PIDController::calculate(float setpoint, float measured) {
     float derivative = (error - lastError) / dt;
     lastError = error;
 
-    float output = kp * error + ki * integral + kd * derivative;
+    float output = kp * error + ki * integral + kd * derivative + bias;
     return constrain(output, 0.0f, 255.0f);
 }
 
@@ -37,4 +37,12 @@ void PIDController::getTunings(float &kp_, float &ki_, float &kd_) const {
     kp_ = kp;
     ki_ = ki;
     kd_ = kd;
+}
+
+void PIDController::setBias(float bias_) {
+    bias = bias_;
+}
+
+float PIDController::getBias() const {
+    return bias;
 }
