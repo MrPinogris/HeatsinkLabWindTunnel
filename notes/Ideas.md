@@ -106,6 +106,30 @@ Acceptance Criteria:
 notes: this is a must have for the lab, it allows students to easily import the data into Excel and to format it for analysis. It also allows us to only export the data that is relevant for the lab and to avoid overwhelming students with too much data. It could be implemented in a way that allows us to easily add new sensors in the future without having to change the CSV export code.
 ```
 ```text
+Title: safty
+Goal: Have a separate microcontroller that is dedicated to the safety of the system, and that can monitor the temperature and other sensors and can shut down the system if it detects any unsafe conditions, such as overheating, sensor failure, or other issues that could pose a risk to students or to the equipment.
+Category: Safety
+
+Importance (1-5): 5
+Necessity (1-5): 5
+Dependency (0/1): 1
+Effort (1-5): 4
+Score: 19
+
+Dependencies: the safety microcontroller should be designed to be independent of the main control microcontroller, so that it can continue to monitor the system and to take action even if the main control microcontroller fails or becomes unresponsive. The safety microcontroller should have its own power supply and its own sensors, so that it can operate independently of the main control microcontroller. The safety microcontroller should be programmed with a set of safety rules and thresholds that are based on the expected operating conditions of the lab, and it should be able to take appropriate actions if it detects any unsafe conditions, such as shutting down the heater, shutting down the fan, or sending an alert to the user. The safety microcontroller should also have a way to log any safety events that occur, so that we can analyze them later and improve the safety of the system over time.
+Acceptance Criteria:
+- the safety microcontroller should be able to monitor the temperature and other sensors in real time, and it should be able to take appropriate actions if it detects any unsafe conditions, such as shutting down the heater, shutting down the fan, or sending an alert to the user
+- the safety microcontroller should be designed to be independent of the main control microcontroller, with its own power supply and its own sensors, so that it can continue to operate even if the main control microcontroller fails or becomes unresponsive
+- the safety microcontroller should be programmed with a set of safety rules and thresholds that are based on the expected operating conditions of the lab, and it should be able to log any safety events that occur for later analysis and improvement of the system's safety
+- have a clear fault code for each type of safety event, so that we can easily identify and troubleshoot any issues that arise
+- have a clear and visible status indicator on the GUI that shows the current safety status of the system (e.g. SAFE, RUNNING, FAULT), so that students and instructors can easily see if the system is operating safely or if there is a fault that needs to be addressed
+- have a way to reset the safety system after a fault has been triggered, so that students can learn from the safety event and can safely resume their experiments after addressing the issue that caused the fault
+
+
+Notes: this is a must have for the lab, it is essential to ensure the safety of students and to protect the equipment from damage. It could be implemented using a simple microcontroller with a few sensors and relays, and it could be programmed with a set of safety rules that are based on the expected operating conditions of the lab. It should be designed to be robust and reliable, so that it can operate effectively in a student lab environment, and it should also be designed to be easy to maintain and to troubleshoot if any issues arise.
+```
+
+```text
 Title: dual file final build
 Goal: have single executable or an installer so it is a program for the GUI and a program that has to be uploaded to the microcontroller for the firmware, and have a clear separation between the two in terms of code and functionality
 Category: GUI/firmweare/final build
