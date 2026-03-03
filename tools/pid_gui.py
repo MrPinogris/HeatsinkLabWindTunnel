@@ -19,7 +19,7 @@ from serial import SerialException
 from serial.tools import list_ports
 
 try:
-    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk  # type: ignore[import-not-found]
     from matplotlib.figure import Figure
 except ImportError as exc:
     raise SystemExit(
@@ -98,6 +98,14 @@ class PIDGui:
         self.manpwm_var = tk.StringVar(value=self._state_value("manpwm", "0.0"))
         self.ctrl_mode_var = tk.StringVar(value=self._state_value("ctrl_mode", "AUTO"))
         self.fan_inv_var = tk.BooleanVar(value=self._state_value("fan_inv", "0") in {"1", "true", "True"})
+        self.spbias_slider_var = tk.DoubleVar(value=0.0)
+        self.sp_slider_var = tk.DoubleVar(value=0.0)
+        self.alpha_slider_var = tk.DoubleVar(value=0.0)
+        self.maxstep_slider_var = tk.DoubleVar(value=0.0)
+        self.entercnt_slider_var = tk.DoubleVar(value=0.0)
+        self.exitcnt_slider_var = tk.DoubleVar(value=0.0)
+        self.fan_slider_var = tk.DoubleVar(value=0.0)
+        self.manpwm_slider_var = tk.DoubleVar(value=0.0)
 
         self.raw_temp_var = tk.StringVar(value="-")
         self.temp_var = tk.StringVar(value="-")
@@ -142,6 +150,12 @@ class PIDGui:
         self.window_seconds_var = tk.StringVar(value="120")
         self.max_points_var = tk.StringVar(value="5000")
         self.offset_var = tk.DoubleVar(value=0.0)
+        self.temp_auto_y_var = tk.BooleanVar(value=self._state_value("temp_auto_y", "1") in {"1", "true", "True"})
+        self.temp_ymin_var = tk.StringVar(value=self._state_value("temp_ymin", "0"))
+        self.temp_ymax_var = tk.StringVar(value=self._state_value("temp_ymax", "120"))
+        self.pwm_auto_y_var = tk.BooleanVar(value=self._state_value("pwm_auto_y", "0") in {"1", "true", "True"})
+        self.pwm_ymin_var = tk.StringVar(value=self._state_value("pwm_ymin", "0"))
+        self.pwm_ymax_var = tk.StringVar(value=self._state_value("pwm_ymax", "255"))
 
         self.times: list[float] = []
         self.raw_values: list[float] = []
@@ -169,6 +183,14 @@ class PIDGui:
         self.csv_start_monotonic = 0.0
 
         self._build_ui()
+        self._sync_slider_from_entry("SPBIAS")
+        self._sync_slider_from_entry("SP")
+        self._sync_slider_from_entry("ALPHA")
+        self._sync_slider_from_entry("MAXSTEP")
+        self._sync_slider_from_entry("ENTERCNT")
+        self._sync_slider_from_entry("EXITCNT")
+        self._sync_slider_from_entry("FAN")
+        self._sync_slider_from_entry("MANPWM")
         self._refresh_ports()
         self._bind_scroll_handlers()
 
@@ -208,6 +230,12 @@ class PIDGui:
             "manpwm": self.manpwm_var.get().strip(),
             "ctrl_mode": self.ctrl_mode_var.get().strip(),
             "fan_inv": "1" if self.fan_inv_var.get() else "0",
+            "temp_auto_y": "1" if self.temp_auto_y_var.get() else "0",
+            "temp_ymin": self.temp_ymin_var.get().strip(),
+            "temp_ymax": self.temp_ymax_var.get().strip(),
+            "pwm_auto_y": "1" if self.pwm_auto_y_var.get() else "0",
+            "pwm_ymin": self.pwm_ymin_var.get().strip(),
+            "pwm_ymax": self.pwm_ymax_var.get().strip(),
         }
         try:
             self.state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
@@ -256,19 +284,107 @@ class PIDGui:
 
         param_frame = ttk.LabelFrame(self.content, text="Controller Parameters", padding=10)
         param_frame.pack(fill="x", pady=(8, 8))
+        param_frame.columnconfigure(3, weight=1)
 
         self._param_row(param_frame, 0, "KP", self.kp_var)
         self._param_row(param_frame, 1, "KI", self.ki_var)
         self._param_row(param_frame, 2, "KD", self.kd_var)
         self._param_row(param_frame, 3, "BIAS", self.bias_var)
-        self._param_row(param_frame, 4, "SPBIAS", self.spbias_var)
-        self._param_row(param_frame, 5, "SP", self.sp_var)
-        self._param_row(param_frame, 6, "ALPHA", self.alpha_var)
-        self._param_row(param_frame, 7, "MAXSTEP", self.maxstep_var)
-        self._param_row(param_frame, 8, "ENTERCNT", self.entercnt_var)
-        self._param_row(param_frame, 9, "EXITCNT", self.exitcnt_var)
-        self._param_row(param_frame, 10, "FAN", self.fan_var)
-        self._param_row(param_frame, 11, "MANPWM", self.manpwm_var)
+
+        ttk.Label(param_frame, text="SPBIAS", width=10).grid(row=4, column=0, sticky="w", pady=2)
+        spbias_entry = ttk.Entry(param_frame, textvariable=self.spbias_var, width=18)
+        spbias_entry.grid(row=4, column=1, sticky="w", pady=2)
+        spbias_entry.bind("<Return>", lambda _e: self._sync_slider_from_entry("SPBIAS"))
+        spbias_entry.bind("<FocusOut>", lambda _e: self._sync_slider_from_entry("SPBIAS"))
+        ttk.Button(param_frame, text="Set SPBIAS", command=lambda: self._set_param("SPBIAS", self.spbias_var)).grid(
+            row=4, column=2, sticky="w", padx=(8, 0), pady=2
+        )
+        ttk.Scale(param_frame, from_=-200.0, to=200.0, variable=self.spbias_slider_var, command=self._on_spbias_slider).grid(
+            row=4, column=3, sticky="ew", padx=(8, 0), pady=2
+        )
+
+        ttk.Label(param_frame, text="SP", width=10).grid(row=5, column=0, sticky="w", pady=2)
+        sp_entry = ttk.Entry(param_frame, textvariable=self.sp_var, width=18)
+        sp_entry.grid(row=5, column=1, sticky="w", pady=2)
+        sp_entry.bind("<Return>", lambda _e: self._sync_slider_from_entry("SP"))
+        sp_entry.bind("<FocusOut>", lambda _e: self._sync_slider_from_entry("SP"))
+        ttk.Button(param_frame, text="Set SP", command=lambda: self._set_param("SP", self.sp_var)).grid(
+            row=5, column=2, sticky="w", padx=(8, 0), pady=2
+        )
+        ttk.Scale(param_frame, from_=-20.0, to=400.0, variable=self.sp_slider_var, command=self._on_sp_slider).grid(
+            row=5, column=3, sticky="ew", padx=(8, 0), pady=2
+        )
+
+        ttk.Label(param_frame, text="ALPHA", width=10).grid(row=6, column=0, sticky="w", pady=2)
+        alpha_entry = ttk.Entry(param_frame, textvariable=self.alpha_var, width=18)
+        alpha_entry.grid(row=6, column=1, sticky="w", pady=2)
+        alpha_entry.bind("<Return>", lambda _e: self._sync_slider_from_entry("ALPHA"))
+        alpha_entry.bind("<FocusOut>", lambda _e: self._sync_slider_from_entry("ALPHA"))
+        ttk.Button(param_frame, text="Set ALPHA", command=lambda: self._set_param("ALPHA", self.alpha_var)).grid(
+            row=6, column=2, sticky="w", padx=(8, 0), pady=2
+        )
+        ttk.Scale(param_frame, from_=0.001, to=1.0, variable=self.alpha_slider_var, command=self._on_alpha_slider).grid(
+            row=6, column=3, sticky="ew", padx=(8, 0), pady=2
+        )
+
+        ttk.Label(param_frame, text="MAXSTEP", width=10).grid(row=7, column=0, sticky="w", pady=2)
+        maxstep_entry = ttk.Entry(param_frame, textvariable=self.maxstep_var, width=18)
+        maxstep_entry.grid(row=7, column=1, sticky="w", pady=2)
+        maxstep_entry.bind("<Return>", lambda _e: self._sync_slider_from_entry("MAXSTEP"))
+        maxstep_entry.bind("<FocusOut>", lambda _e: self._sync_slider_from_entry("MAXSTEP"))
+        ttk.Button(param_frame, text="Set MAXSTEP", command=lambda: self._set_param("MAXSTEP", self.maxstep_var)).grid(
+            row=7, column=2, sticky="w", padx=(8, 0), pady=2
+        )
+        ttk.Scale(param_frame, from_=0.0, to=255.0, variable=self.maxstep_slider_var, command=self._on_maxstep_slider).grid(
+            row=7, column=3, sticky="ew", padx=(8, 0), pady=2
+        )
+
+        ttk.Label(param_frame, text="ENTERCNT", width=10).grid(row=8, column=0, sticky="w", pady=2)
+        entercnt_entry = ttk.Entry(param_frame, textvariable=self.entercnt_var, width=18)
+        entercnt_entry.grid(row=8, column=1, sticky="w", pady=2)
+        entercnt_entry.bind("<Return>", lambda _e: self._sync_slider_from_entry("ENTERCNT"))
+        entercnt_entry.bind("<FocusOut>", lambda _e: self._sync_slider_from_entry("ENTERCNT"))
+        ttk.Button(param_frame, text="Set ENTERCNT", command=lambda: self._set_param("ENTERCNT", self.entercnt_var)).grid(
+            row=8, column=2, sticky="w", padx=(8, 0), pady=2
+        )
+        ttk.Scale(param_frame, from_=1.0, to=400.0, variable=self.entercnt_slider_var, command=self._on_entercnt_slider).grid(
+            row=8, column=3, sticky="ew", padx=(8, 0), pady=2
+        )
+
+        ttk.Label(param_frame, text="EXITCNT", width=10).grid(row=9, column=0, sticky="w", pady=2)
+        exitcnt_entry = ttk.Entry(param_frame, textvariable=self.exitcnt_var, width=18)
+        exitcnt_entry.grid(row=9, column=1, sticky="w", pady=2)
+        exitcnt_entry.bind("<Return>", lambda _e: self._sync_slider_from_entry("EXITCNT"))
+        exitcnt_entry.bind("<FocusOut>", lambda _e: self._sync_slider_from_entry("EXITCNT"))
+        ttk.Button(param_frame, text="Set EXITCNT", command=lambda: self._set_param("EXITCNT", self.exitcnt_var)).grid(
+            row=9, column=2, sticky="w", padx=(8, 0), pady=2
+        )
+        ttk.Scale(param_frame, from_=1.0, to=400.0, variable=self.exitcnt_slider_var, command=self._on_exitcnt_slider).grid(
+            row=9, column=3, sticky="ew", padx=(8, 0), pady=2
+        )
+        ttk.Label(param_frame, text="FAN", width=10).grid(row=10, column=0, sticky="w", pady=2)
+        fan_entry = ttk.Entry(param_frame, textvariable=self.fan_var, width=18)
+        fan_entry.grid(row=10, column=1, sticky="w", pady=2)
+        fan_entry.bind("<Return>", lambda _e: self._sync_slider_from_entry("FAN"))
+        fan_entry.bind("<FocusOut>", lambda _e: self._sync_slider_from_entry("FAN"))
+        ttk.Button(param_frame, text="Set FAN", command=lambda: self._set_param("FAN", self.fan_var)).grid(
+            row=10, column=2, sticky="w", padx=(8, 0), pady=2
+        )
+        ttk.Scale(param_frame, from_=0.0, to=100.0, variable=self.fan_slider_var, command=self._on_fan_slider).grid(
+            row=10, column=3, sticky="ew", padx=(8, 0), pady=2
+        )
+
+        ttk.Label(param_frame, text="MANPWM", width=10).grid(row=11, column=0, sticky="w", pady=2)
+        manpwm_entry = ttk.Entry(param_frame, textvariable=self.manpwm_var, width=18)
+        manpwm_entry.grid(row=11, column=1, sticky="w", pady=2)
+        manpwm_entry.bind("<Return>", lambda _e: self._sync_slider_from_entry("MANPWM"))
+        manpwm_entry.bind("<FocusOut>", lambda _e: self._sync_slider_from_entry("MANPWM"))
+        ttk.Button(param_frame, text="Set MANPWM", command=lambda: self._set_param("MANPWM", self.manpwm_var)).grid(
+            row=11, column=2, sticky="w", padx=(8, 0), pady=2
+        )
+        ttk.Scale(param_frame, from_=0.0, to=255.0, variable=self.manpwm_slider_var, command=self._on_manpwm_slider).grid(
+            row=11, column=3, sticky="ew", padx=(8, 0), pady=2
+        )
 
         mode_row = ttk.Frame(param_frame)
         mode_row.grid(row=12, column=0, columnspan=3, sticky="w", pady=(4, 2))
@@ -358,6 +474,22 @@ class PIDGui:
         ttk.Button(action_row, text="Apply View", command=self._apply_plot_config).pack(side="left", padx=(0, 6))
         ttk.Button(action_row, text="Clear Plot", command=self._clear_plot).pack(side="left")
 
+        ttk.Checkbutton(config_frame, text="Auto Temp Y", variable=self.temp_auto_y_var).grid(row=3, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(config_frame, text="Temp Y min/max").grid(row=4, column=0, sticky="w")
+        temp_y_row = ttk.Frame(config_frame)
+        temp_y_row.grid(row=4, column=1, padx=(6, 0), sticky="w")
+        ttk.Entry(temp_y_row, textvariable=self.temp_ymin_var, width=6).pack(side="left")
+        ttk.Label(temp_y_row, text=" / ").pack(side="left")
+        ttk.Entry(temp_y_row, textvariable=self.temp_ymax_var, width=6).pack(side="left")
+
+        ttk.Checkbutton(config_frame, text="Auto PWM Y", variable=self.pwm_auto_y_var).grid(row=5, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(config_frame, text="PWM Y min/max").grid(row=6, column=0, sticky="w")
+        pwm_y_row = ttk.Frame(config_frame)
+        pwm_y_row.grid(row=6, column=1, padx=(6, 0), sticky="w")
+        ttk.Entry(pwm_y_row, textvariable=self.pwm_ymin_var, width=6).pack(side="left")
+        ttk.Label(pwm_y_row, text=" / ").pack(side="left")
+        ttk.Entry(pwm_y_row, textvariable=self.pwm_ymax_var, width=6).pack(side="left")
+
         offset_wrap = ttk.Frame(plot_controls)
         offset_wrap.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(10, 0))
         offset_wrap.columnconfigure(1, weight=1)
@@ -411,14 +543,14 @@ class PIDGui:
     def _on_canvas_configure(self, event: tk.Event) -> None:
         self.main_canvas.itemconfigure(self.canvas_window, width=max(event.width, 980))
 
-    def _param_row(self, parent: ttk.Frame, row: int, name: str, variable: tk.StringVar) -> None:
+    def _param_row(self, parent: tk.Widget, row: int, name: str, variable: tk.StringVar) -> None:
         ttk.Label(parent, text=name, width=10).grid(row=row, column=0, sticky="w", pady=2)
         ttk.Entry(parent, textvariable=variable, width=18).grid(row=row, column=1, sticky="w", pady=2)
         ttk.Button(parent, text=f"Set {name}", command=lambda: self._set_param(name, variable)).grid(
             row=row, column=2, sticky="w", padx=(8, 0), pady=2
         )
 
-    def _live_row(self, parent: ttk.Frame, row: int, label: str, variable: tk.StringVar) -> None:
+    def _live_row(self, parent: tk.Widget, row: int, label: str, variable: tk.StringVar) -> None:
         ttk.Label(parent, text=label, width=20).grid(row=row, column=0, sticky="w", pady=2)
         ttk.Label(parent, textvariable=variable).grid(row=row, column=1, sticky="w", pady=2)
 
@@ -572,12 +704,119 @@ class PIDGui:
             self._disconnect()
 
     def _set_param(self, key: str, variable: tk.StringVar) -> None:
+        if key in {"SPBIAS", "SP", "ALPHA", "MAXSTEP", "ENTERCNT", "EXITCNT", "FAN", "MANPWM"}:
+            self._sync_slider_from_entry(key)
+
         value = variable.get().strip()
         if not value:
             messagebox.showerror("Missing Value", f"Enter a value for {key}.")
             return
         self._save_state()
         self._send_command(f"SET {key} {value}")
+
+    def _on_fan_slider(self, _value: str) -> None:
+        self.fan_var.set(f"{self.fan_slider_var.get():.1f}")
+
+    def _on_manpwm_slider(self, _value: str) -> None:
+        self.manpwm_var.set(f"{self.manpwm_slider_var.get():.2f}")
+
+    def _on_spbias_slider(self, _value: str) -> None:
+        self.spbias_var.set(f"{self.spbias_slider_var.get():.2f}")
+
+    def _on_sp_slider(self, _value: str) -> None:
+        self.sp_var.set(f"{self.sp_slider_var.get():.2f}")
+
+    def _on_alpha_slider(self, _value: str) -> None:
+        self.alpha_var.set(f"{self.alpha_slider_var.get():.3f}")
+
+    def _on_maxstep_slider(self, _value: str) -> None:
+        self.maxstep_var.set(f"{int(round(self.maxstep_slider_var.get()))}")
+
+    def _on_entercnt_slider(self, _value: str) -> None:
+        self.entercnt_var.set(f"{int(round(self.entercnt_slider_var.get()))}")
+
+    def _on_exitcnt_slider(self, _value: str) -> None:
+        self.exitcnt_var.set(f"{int(round(self.exitcnt_slider_var.get()))}")
+
+    def _sync_slider_from_entry(self, key: str) -> None:
+        if key == "SPBIAS":
+            try:
+                value = float(self.spbias_var.get().strip())
+            except ValueError:
+                value = 0.0
+            value = max(-200.0, min(200.0, value))
+            self.spbias_var.set(f"{value:.2f}")
+            self.spbias_slider_var.set(value)
+            return
+
+        if key == "SP":
+            try:
+                value = float(self.sp_var.get().strip())
+            except ValueError:
+                value = 70.0
+            value = max(-20.0, min(400.0, value))
+            self.sp_var.set(f"{value:.2f}")
+            self.sp_slider_var.set(value)
+            return
+
+        if key == "ALPHA":
+            try:
+                value = float(self.alpha_var.get().strip())
+            except ValueError:
+                value = 0.25
+            value = max(0.001, min(1.0, value))
+            self.alpha_var.set(f"{value:.3f}")
+            self.alpha_slider_var.set(value)
+            return
+
+        if key == "MAXSTEP":
+            try:
+                value = int(round(float(self.maxstep_var.get().strip())))
+            except ValueError:
+                value = 15
+            value = max(0, min(255, value))
+            self.maxstep_var.set(f"{value}")
+            self.maxstep_slider_var.set(float(value))
+            return
+
+        if key == "ENTERCNT":
+            try:
+                value = int(round(float(self.entercnt_var.get().strip())))
+            except ValueError:
+                value = 16
+            value = max(1, min(400, value))
+            self.entercnt_var.set(f"{value}")
+            self.entercnt_slider_var.set(float(value))
+            return
+
+        if key == "EXITCNT":
+            try:
+                value = int(round(float(self.exitcnt_var.get().strip())))
+            except ValueError:
+                value = 8
+            value = max(1, min(400, value))
+            self.exitcnt_var.set(f"{value}")
+            self.exitcnt_slider_var.set(float(value))
+            return
+
+        if key == "FAN":
+            try:
+                value = float(self.fan_var.get().strip())
+            except ValueError:
+                value = 0.0
+            value = max(0.0, min(100.0, value))
+            self.fan_var.set(f"{value:.1f}")
+            self.fan_slider_var.set(value)
+            return
+
+        if key == "MANPWM":
+            try:
+                value = float(self.manpwm_var.get().strip())
+            except ValueError:
+                value = 0.0
+            value = max(0.0, min(255.0, value))
+            self.manpwm_var.set(f"{value:.2f}")
+            self.manpwm_slider_var.set(value)
 
     def _apply_all(self) -> None:
         self._set_param("KP", self.kp_var)
@@ -799,6 +1038,14 @@ class PIDGui:
             self.manpwm_var.set(cfg.group(14))
             self.run_live_var.set(cfg.group(15))
             self.fan_inv_live_var.set("Yes" if cfg.group(12) == "1" else "No")
+            self._sync_slider_from_entry("SPBIAS")
+            self._sync_slider_from_entry("SP")
+            self._sync_slider_from_entry("ALPHA")
+            self._sync_slider_from_entry("MAXSTEP")
+            self._sync_slider_from_entry("ENTERCNT")
+            self._sync_slider_from_entry("EXITCNT")
+            self._sync_slider_from_entry("FAN")
+            self._sync_slider_from_entry("MANPWM")
             self._save_state()
 
     def _append_log(self, text: str) -> None:
@@ -955,37 +1202,97 @@ class PIDGui:
                     x_max = t[-1]
                     x_min = max(t[0], x_max - window)
 
+        def latest_in_window(values: list[float]) -> float | None:
+            for idx in range(len(t) - 1, -1, -1):
+                if x_min <= t[idx] <= x_max:
+                    return values[idx]
+            return values[-1] if values else None
+
         if self.show_raw_var.get():
-            self.ax_temp.plot(t, raw, color="#1f77b4", linewidth=1.0, label="Raw")
+            v = latest_in_window(raw)
+            label = f"Raw {v:.2f}" if v is not None else "Raw"
+            self.ax_temp.plot(t, raw, color="#1f77b4", linewidth=1.0, label=label)
         if self.show_temp_var.get():
-            self.ax_temp.plot(t, temp, color="#2ca02c", linewidth=1.2, label="Temp")
+            v = latest_in_window(temp)
+            label = f"Temp {v:.2f}" if v is not None else "Temp"
+            self.ax_temp.plot(t, temp, color="#2ca02c", linewidth=1.2, label=label)
         if self.show_smooth_var.get():
-            self.ax_temp.plot(t, smooth, color="#d62728", linewidth=1.5, label="Smooth")
+            v = latest_in_window(smooth)
+            label = f"Smooth {v:.2f}" if v is not None else "Smooth"
+            self.ax_temp.plot(t, smooth, color="#d62728", linewidth=1.5, label=label)
         if self.show_sp_var.get():
-            self.ax_temp.plot(t, sp, color="#9467bd", linewidth=1.2, linestyle="--", label="SP")
+            v = latest_in_window(sp)
+            label = f"SP {v:.2f}" if v is not None else "SP"
+            self.ax_temp.plot(t, sp, color="#9467bd", linewidth=1.2, linestyle="--", label=label)
         if self.show_pwm_var.get():
-            self.ax_pwm.plot(t, pwm, color="#ff7f0e", linewidth=1.2, label="PWM")
+            v = latest_in_window(pwm)
+            label = f"PWM {v:.0f}" if v is not None else "PWM"
+            self.ax_pwm.plot(t, pwm, color="#ff7f0e", linewidth=1.2, label=label)
         if self.show_fan_pwm_var.get():
-            self.ax_pwm.plot(t, fan_pwm, color="#17becf", linewidth=1.2, linestyle="--", label="Fan PWM")
+            v = latest_in_window(fan_pwm)
+            label = f"Fan PWM {v:.0f}" if v is not None else "Fan PWM"
+            self.ax_pwm.plot(t, fan_pwm, color="#17becf", linewidth=1.2, linestyle="--", label=label)
         if self.show_p_var.get():
-            self.ax_pwm.plot(t, p_term, color="#8c564b", linewidth=1.2, linestyle="-.", label="P")
+            v = latest_in_window(p_term)
+            label = f"P {v:.2f}" if v is not None else "P"
+            self.ax_pwm.plot(t, p_term, color="#8c564b", linewidth=1.2, linestyle="-.", label=label)
         if self.show_i_var.get():
-            self.ax_pwm.plot(t, i_term, color="#bcbd22", linewidth=1.2, linestyle="-.", label="I")
+            v = latest_in_window(i_term)
+            label = f"I {v:.2f}" if v is not None else "I"
+            self.ax_pwm.plot(t, i_term, color="#bcbd22", linewidth=1.2, linestyle="-.", label=label)
         if self.show_d_var.get():
-            self.ax_pwm.plot(t, d_term, color="#7f7f7f", linewidth=1.2, linestyle="-.", label="D")
+            v = latest_in_window(d_term)
+            label = f"D {v:.2f}" if v is not None else "D"
+            self.ax_pwm.plot(t, d_term, color="#7f7f7f", linewidth=1.2, linestyle="-.", label=label)
         if self.show_out_var.get():
-            self.ax_pwm.plot(t, out, color="#e377c2", linewidth=1.2, linestyle="--", label="PID OUT")
+            v = latest_in_window(out)
+            label = f"PID OUT {v:.2f}" if v is not None else "PID OUT"
+            self.ax_pwm.plot(t, out, color="#e377c2", linewidth=1.2, linestyle="--", label=label)
         if self.show_holdpwm_var.get():
-            self.ax_pwm.plot(t, holdpwm, color="#ff1493", linewidth=1.2, linestyle=":", label="HOLD PWM")
+            v = latest_in_window(holdpwm)
+            label = f"HOLD PWM {v:.2f}" if v is not None else "HOLD PWM"
+            self.ax_pwm.plot(t, holdpwm, color="#ff1493", linewidth=1.2, linestyle=":", label=label)
         if self.show_enter_prog_var.get():
-            self.ax_pwm.plot(t, enter_prog, color="#005f73", linewidth=1.2, linestyle="-", label="ENTER %")
+            v = latest_in_window(enter_prog)
+            label = f"ENTER % {v:.1f}" if v is not None else "ENTER %"
+            self.ax_pwm.plot(t, enter_prog, color="#005f73", linewidth=1.2, linestyle="-", label=label)
         if self.show_exit_prog_var.get():
-            self.ax_pwm.plot(t, exit_prog, color="#ca6702", linewidth=1.2, linestyle="-", label="EXIT %")
+            v = latest_in_window(exit_prog)
+            label = f"EXIT % {v:.1f}" if v is not None else "EXIT %"
+            self.ax_pwm.plot(t, exit_prog, color="#ca6702", linewidth=1.2, linestyle="-", label=label)
 
         self.ax_temp.set_xlabel("Time [s]")
         self.ax_temp.set_ylabel("Temperature [C]")
         self.ax_pwm.set_ylabel("PWM")
-        self.ax_pwm.set_ylim(0, 255)
+        self.ax_temp.yaxis.set_label_position("left")
+        self.ax_temp.yaxis.tick_left()
+        self.ax_pwm.yaxis.set_label_position("right")
+        self.ax_pwm.yaxis.tick_right()
+
+        if self.temp_auto_y_var.get():
+            self.ax_temp.relim()
+            self.ax_temp.autoscale_view(scalex=False, scaley=True)
+        else:
+            try:
+                tmin = float(self.temp_ymin_var.get().strip())
+                tmax = float(self.temp_ymax_var.get().strip())
+                if tmax > tmin:
+                    self.ax_temp.set_ylim(tmin, tmax)
+            except ValueError:
+                pass
+
+        if self.pwm_auto_y_var.get():
+            self.ax_pwm.relim()
+            self.ax_pwm.autoscale_view(scalex=False, scaley=True)
+        else:
+            try:
+                pmin = float(self.pwm_ymin_var.get().strip())
+                pmax = float(self.pwm_ymax_var.get().strip())
+                if pmax > pmin:
+                    self.ax_pwm.set_ylim(pmin, pmax)
+            except ValueError:
+                pass
+
         self.ax_temp.grid(alpha=0.25)
         self.ax_temp.set_xlim(x_min, x_max)
 
