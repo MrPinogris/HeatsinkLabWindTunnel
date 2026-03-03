@@ -106,6 +106,27 @@ Acceptance Criteria:
 notes: this is a must have for the lab, it allows students to easily import the data into Excel and to format it for analysis. It also allows us to only export the data that is relevant for the lab and to avoid overwhelming students with too much data. It could be implemented in a way that allows us to easily add new sensors in the future without having to change the CSV export code.
 ```
 ```text
+Title: dual file final build
+Goal: have single executable or an installer so it is a program for the GUI and a program that has to be uploaded to the microcontroller for the firmware, and have a clear separation between the two in terms of code and functionality
+Category: GUI/firmweare/final build
+
+Importance (1-5): 3
+Necessity (1-5): 5
+Dependency (0/1): 1
+Effort (1-5): 4
+Score: 13
+
+Dependencies: the GUI and the firmware should be developed in parallel but with a clear separation of concerns, so that the GUI can be developed and tested independently of the firmware, and vice versa. The GUI should be designed to work with a defined communication protocol with the firmware, so that we can easily swap out the firmware or the GUI without having to change the other. The final build should include an installer for the GUI that sets up all the necessary dependencies and configurations, and it should also include a way to upload the firmware to the microcontroller, such as through a USB connection or through an SD card. The final build should also include clear instructions for how to install and use the GUI and how to upload the firmware, so that it is easy for students and instructors to get started with the lab.
+Acceptance Criteria:
+- the final build should include a single executable or an installer for the GUI, and a separate program for the firmware that can be uploaded to the microcontroller
+- the GUI and the firmware should have a clear separation of concerns, with well-defined communication protocols between the two
+- the final build should include clear instructions for how to install and use the GUI and how to upload the firmware, so that it is easy for students and instructors to get started with the lab
+- ...
+
+Notes: The firmweare should not be nessary becase the end goal is also to have a fully build setup that can be used by students and instructors without having to worry about the technical details of how to upload the firmware, but it is important to have a clear separation between the GUI and the firmware in terms of code and functionality, so that we can easily develop and test them independently, and so that we can easily swap out one or the other if needed. The final build should be designed with ease of use in mind, so that it is accessible to students with no prior experience with programming or electronics, and it should also be designed to be robust and reliable, so that it can withstand the rigors of a student lab environment. the firmweaer is also given for in the instance if we want to have a setup where the students can upload their own firmware to the microcontroller to test different control algorithms or different sensor configurations, but it is not essential for the core functionality of the lab, and it could be added as an optional feature after we have a stable and usable version of the GUI with the core features. or the firmweare becomes corruptes or other issues arise with the microcontroller, having the firmware available allows us to quickly re-upload it and get the lab back up and running without having to wait for a new microcontroller or a new pre-flashed firmware to arrive.
+```
+
+```text
 Title: graph cursor 
 Goal: have the abilithy to add a cursor in the graph in GUI
 Category: GUI
