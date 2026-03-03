@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import json
+import csv
 import queue
 import re
 import threading
 import tkinter as tk
 import time
+import datetime as dt
 from pathlib import Path
 from tkinter import messagebox, ttk
 
@@ -41,6 +43,7 @@ TELEMETRY_RE = re.compile(
     r"FAN:\s*([-+]?\d*\.?\d+)\D+"
     r"FANPWM:\s*([-+]?\d+)"
     r"(?:\D+MODE:\s*(AUTO|MANUAL|SMART)\D+STATE:\s*(PID|HOLD|MANUAL)\D+MANPWM:\s*([-+]?\d*\.?\d+)\D+HOLDPWM:\s*([-+]?\d*\.?\d+)\D+ENTPROG:\s*([-+]?\d*\.?\d+)\D+EXTPROG:\s*([-+]?\d*\.?\d+)\D+EABS:\s*([-+]?\d*\.?\d+))?"
+    r"(?:\D+RUN:\s*(ON|OFF)\D+FANINV:\s*([01]))?"
 )
 CFG_RE = re.compile(
     r"CFG\s+KP:\s*([-+]?\d*\.?\d+)\s*\|\s*"
@@ -51,9 +54,13 @@ CFG_RE = re.compile(
     r"SP:\s*([-+]?\d*\.?\d+)\s*\|\s*"
     r"ALPHA:\s*([-+]?\d*\.?\d+)\s*\|\s*"
     r"MAXSTEP:\s*([-+]?\d+)\s*\|\s*"
+    r"ENTCNT:\s*([-+]?\d+)\s*\|\s*"
+    r"EXTCNT:\s*([-+]?\d+)\s*\|\s*"
     r"FAN:\s*([-+]?\d*\.?\d+)\s*\|\s*"
+    r"FANINV:\s*([01])\s*\|\s*"
     r"MODE:\s*(AUTO|MANUAL|SMART)\s*\|\s*"
-    r"MANPWM:\s*([-+]?\d*\.?\d+)"
+    r"MANPWM:\s*([-+]?\d*\.?\d+)\s*\|\s*"
+    r"RUN:\s*(ON|OFF)"
 )
 
 
@@ -75,6 +82,7 @@ class PIDGui:
         self.port_var = tk.StringVar()
         self.baud_var = tk.StringVar(value="115200")
         self.status_var = tk.StringVar(value="Disconnected")
+        self.csv_status_var = tk.StringVar(value="CSV: Off")
 
         self.kp_var = tk.StringVar(value=self._state_value("kp", "8.0"))
         self.ki_var = tk.StringVar(value=self._state_value("ki", "0.06"))
@@ -84,9 +92,12 @@ class PIDGui:
         self.sp_var = tk.StringVar(value=self._state_value("sp", "70.0"))
         self.alpha_var = tk.StringVar(value=self._state_value("alpha", "0.25"))
         self.maxstep_var = tk.StringVar(value=self._state_value("maxstep", "15"))
+        self.entercnt_var = tk.StringVar(value=self._state_value("entercnt", "16"))
+        self.exitcnt_var = tk.StringVar(value=self._state_value("exitcnt", "8"))
         self.fan_var = tk.StringVar(value=self._state_value("fan", "0"))
         self.manpwm_var = tk.StringVar(value=self._state_value("manpwm", "0.0"))
         self.ctrl_mode_var = tk.StringVar(value=self._state_value("ctrl_mode", "AUTO"))
+        self.fan_inv_var = tk.BooleanVar(value=self._state_value("fan_inv", "0") in {"1", "true", "True"})
 
         self.raw_temp_var = tk.StringVar(value="-")
         self.temp_var = tk.StringVar(value="-")
@@ -109,6 +120,8 @@ class PIDGui:
         self.enter_prog_live_var = tk.StringVar(value="-")
         self.exit_prog_live_var = tk.StringVar(value="-")
         self.abs_err_live_var = tk.StringVar(value="-")
+        self.run_live_var = tk.StringVar(value="-")
+        self.fan_inv_live_var = tk.StringVar(value="-")
 
         self.show_raw_var = tk.BooleanVar(value=True)
         self.show_temp_var = tk.BooleanVar(value=True)
@@ -149,6 +162,11 @@ class PIDGui:
         self.awaiting_handshake = False
         self.handshake_deadline = 0.0
         self.handshake_ok = False
+        self.csv_logging_enabled = False
+        self.csv_file = None
+        self.csv_writer = None
+        self.csv_path: Path | None = None
+        self.csv_start_monotonic = 0.0
 
         self._build_ui()
         self._refresh_ports()
@@ -184,9 +202,12 @@ class PIDGui:
             "sp": self.sp_var.get().strip(),
             "alpha": self.alpha_var.get().strip(),
             "maxstep": self.maxstep_var.get().strip(),
+            "entercnt": self.entercnt_var.get().strip(),
+            "exitcnt": self.exitcnt_var.get().strip(),
             "fan": self.fan_var.get().strip(),
             "manpwm": self.manpwm_var.get().strip(),
             "ctrl_mode": self.ctrl_mode_var.get().strip(),
+            "fan_inv": "1" if self.fan_inv_var.get() else "0",
         }
         try:
             self.state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
@@ -229,6 +250,10 @@ class PIDGui:
         ttk.Button(top, text="Disconnect", command=self._disconnect).grid(row=0, column=6, padx=(0, 10))
         ttk.Label(top, textvariable=self.status_var).grid(row=0, column=7, sticky="w")
 
+        ttk.Button(top, text="Start CSV", command=self._start_csv_logging).grid(row=1, column=5, padx=(0, 6), pady=(6, 0))
+        ttk.Button(top, text="Stop CSV", command=self._stop_csv_logging).grid(row=1, column=6, padx=(0, 10), pady=(6, 0))
+        ttk.Label(top, textvariable=self.csv_status_var).grid(row=1, column=7, sticky="w", pady=(6, 0))
+
         param_frame = ttk.LabelFrame(self.content, text="Controller Parameters", padding=10)
         param_frame.pack(fill="x", pady=(8, 8))
 
@@ -240,19 +265,28 @@ class PIDGui:
         self._param_row(param_frame, 5, "SP", self.sp_var)
         self._param_row(param_frame, 6, "ALPHA", self.alpha_var)
         self._param_row(param_frame, 7, "MAXSTEP", self.maxstep_var)
-        self._param_row(param_frame, 8, "FAN", self.fan_var)
-        self._param_row(param_frame, 9, "MANPWM", self.manpwm_var)
+        self._param_row(param_frame, 8, "ENTERCNT", self.entercnt_var)
+        self._param_row(param_frame, 9, "EXITCNT", self.exitcnt_var)
+        self._param_row(param_frame, 10, "FAN", self.fan_var)
+        self._param_row(param_frame, 11, "MANPWM", self.manpwm_var)
 
         mode_row = ttk.Frame(param_frame)
-        mode_row.grid(row=10, column=0, columnspan=3, sticky="w", pady=(4, 2))
+        mode_row.grid(row=12, column=0, columnspan=3, sticky="w", pady=(4, 2))
         ttk.Label(mode_row, text="MODE", width=10).pack(side="left")
         ttk.Radiobutton(mode_row, text="AUTO", value="AUTO", variable=self.ctrl_mode_var).pack(side="left")
         ttk.Radiobutton(mode_row, text="MANUAL", value="MANUAL", variable=self.ctrl_mode_var).pack(side="left", padx=(8, 0))
         ttk.Radiobutton(mode_row, text="SMART", value="SMART", variable=self.ctrl_mode_var).pack(side="left", padx=(8, 0))
         ttk.Button(mode_row, text="Set MODE", command=self._set_mode).pack(side="left", padx=(10, 0))
 
+        safety_row = ttk.Frame(param_frame)
+        safety_row.grid(row=13, column=0, columnspan=3, sticky="w", pady=(2, 2))
+        ttk.Checkbutton(safety_row, text="Fan PWM Inverted", variable=self.fan_inv_var).pack(side="left")
+        ttk.Button(safety_row, text="Apply FANINV", command=self._set_fan_inversion).pack(side="left", padx=(8, 0))
+        ttk.Button(safety_row, text="Start Heater", command=self._run_on).pack(side="left", padx=(14, 0))
+        ttk.Button(safety_row, text="Stop Heater", command=self._run_off).pack(side="left", padx=(6, 0))
+
         param_buttons = ttk.Frame(param_frame)
-        param_buttons.grid(row=11, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        param_buttons.grid(row=14, column=0, columnspan=3, sticky="w", pady=(8, 0))
         ttk.Button(param_buttons, text="Apply All", command=self._apply_all).pack(side="left", padx=(0, 8))
         ttk.Button(param_buttons, text="Get From ESP32", command=self._request_get).pack(side="left")
 
@@ -280,6 +314,8 @@ class PIDGui:
         self._live_row(live, 18, "Enter Progress [%]", self.enter_prog_live_var)
         self._live_row(live, 19, "Exit Progress [%]", self.exit_prog_live_var)
         self._live_row(live, 20, "Abs Error [C]", self.abs_err_live_var)
+        self._live_row(live, 21, "Run State", self.run_live_var)
+        self._live_row(live, 22, "Fan Inverted", self.fan_inv_live_var)
 
         plot_controls = ttk.LabelFrame(self.content, text="Plot Controls", padding=10)
         plot_controls.pack(fill="x", pady=(0, 8))
@@ -429,13 +465,100 @@ class PIDGui:
         self.handshake_ok = False
         self.status_var.set("Disconnected")
         self._append_log("Disconnected")
+        self._stop_csv_logging()
 
     def _on_close(self) -> None:
         self._save_state()
+        self._stop_csv_logging()
         self._disconnect()
         self.main_canvas.unbind_all("<MouseWheel>")
         self.main_canvas.unbind_all("<Shift-MouseWheel>")
         self.root.destroy()
+
+    def _default_csv_path(self) -> Path:
+        logs_dir = Path(__file__).resolve().parents[1] / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        return logs_dir / f"serial_{stamp}.csv"
+
+    def _start_csv_logging(self) -> None:
+        if self.csv_logging_enabled:
+            return
+
+        if not self.serial_conn or not self.serial_conn.is_open:
+            messagebox.showerror("Not Connected", "Connect to ESP32 before starting CSV logging.")
+            return
+
+        path = self._default_csv_path()
+        fieldnames = [
+            "timestamp_iso",
+            "elapsed_s",
+            "raw_temp_c",
+            "temp_filtered_c",
+            "temp_smooth_c",
+            "pwm",
+            "p_term",
+            "i_term",
+            "d_term",
+            "pid_out",
+            "pid_bias",
+            "setpoint_bias_c",
+            "setpoint_c",
+            "effective_setpoint_c",
+            "fan_speed_pct",
+            "fan_pwm_raw",
+            "mode",
+            "state",
+            "manual_pwm_cmd",
+            "hold_pwm",
+            "enter_progress_pct",
+            "exit_progress_pct",
+            "abs_error_c",
+            "run_state",
+            "fan_inverted",
+        ]
+
+        try:
+            self.csv_file = open(path, "w", newline="", encoding="utf-8")
+            self.csv_writer = csv.DictWriter(self.csv_file, fieldnames=fieldnames)
+            self.csv_writer.writeheader()
+            self.csv_file.flush()
+        except OSError as exc:
+            self.csv_file = None
+            self.csv_writer = None
+            messagebox.showerror("CSV Error", f"Could not open CSV file:\n{path}\n\n{exc}")
+            return
+
+        self.csv_path = path
+        self.csv_start_monotonic = time.monotonic()
+        self.csv_logging_enabled = True
+        self.csv_status_var.set(f"CSV: On ({path.name})")
+        self._append_log(f"CSV logging started: {path}")
+
+    def _stop_csv_logging(self) -> None:
+        if self.csv_file:
+            try:
+                self.csv_file.flush()
+                self.csv_file.close()
+            except OSError:
+                pass
+        if self.csv_logging_enabled and self.csv_path:
+            self._append_log(f"CSV logging stopped: {self.csv_path}")
+        self.csv_logging_enabled = False
+        self.csv_file = None
+        self.csv_writer = None
+        self.csv_path = None
+        self.csv_status_var.set("CSV: Off")
+
+    def _write_csv_row(self, row: dict[str, object]) -> None:
+        if not self.csv_logging_enabled or not self.csv_writer or not self.csv_file:
+            return
+        try:
+            self.csv_writer.writerow(row)
+            self.csv_file.flush()
+        except OSError as exc:
+            self._append_log(f"CSV write error: {exc}")
+            self._stop_csv_logging()
 
     def _send_command(self, command: str) -> None:
         if not self.serial_conn or not self.serial_conn.is_open:
@@ -465,8 +588,11 @@ class PIDGui:
         self._set_param("SP", self.sp_var)
         self._set_param("ALPHA", self.alpha_var)
         self._set_param("MAXSTEP", self.maxstep_var)
+        self._set_param("ENTERCNT", self.entercnt_var)
+        self._set_param("EXITCNT", self.exitcnt_var)
         self._set_param("FAN", self.fan_var)
         self._set_param("MANPWM", self.manpwm_var)
+        self._set_fan_inversion()
         self._set_mode()
 
     def _set_mode(self) -> None:
@@ -476,6 +602,17 @@ class PIDGui:
             return
         self._save_state()
         self._send_command(f"SET MODE {value}")
+
+    def _set_fan_inversion(self) -> None:
+        value = "1" if self.fan_inv_var.get() else "0"
+        self._save_state()
+        self._send_command(f"SET FANINV {value}")
+
+    def _run_on(self) -> None:
+        self._send_command("SET RUN ON")
+
+    def _run_off(self) -> None:
+        self._send_command("SET RUN OFF")
 
     def _request_get(self) -> None:
         self._send_command("GET")
@@ -545,6 +682,8 @@ class PIDGui:
             enter_prog_text = telemetry.group(19) or "0"
             exit_prog_text = telemetry.group(20) or "0"
             abs_err_text = telemetry.group(21) or "0"
+            run_state = telemetry.group(22) or "ON"
+            fan_inv_state = telemetry.group(23) or ("1" if self.fan_inv_var.get() else "0")
             try:
                 manpwm = float(manpwm_text)
             except ValueError:
@@ -587,6 +726,39 @@ class PIDGui:
             self.enter_prog_live_var.set(f"{enter_prog:.1f}")
             self.exit_prog_live_var.set(f"{exit_prog:.1f}")
             self.abs_err_live_var.set(f"{abs_err:.2f}")
+            self.run_live_var.set(run_state)
+            self.fan_inv_live_var.set("Yes" if fan_inv_state == "1" else "No")
+
+            now_iso = dt.datetime.now(dt.timezone.utc).astimezone().isoformat(timespec="milliseconds")
+            self._write_csv_row(
+                {
+                    "timestamp_iso": now_iso,
+                    "elapsed_s": f"{max(0.0, time.monotonic() - self.csv_start_monotonic):.3f}",
+                    "raw_temp_c": raw,
+                    "temp_filtered_c": temp,
+                    "temp_smooth_c": smooth,
+                    "pwm": int(round(pwm)),
+                    "p_term": p_term,
+                    "i_term": i_term,
+                    "d_term": d_term,
+                    "pid_out": out,
+                    "pid_bias": bias,
+                    "setpoint_bias_c": spbias,
+                    "setpoint_c": sp,
+                    "effective_setpoint_c": effsp,
+                    "fan_speed_pct": fan_speed,
+                    "fan_pwm_raw": int(round(fan_pwm)),
+                    "mode": ctrl_mode,
+                    "state": ctrl_state,
+                    "manual_pwm_cmd": manpwm,
+                    "hold_pwm": holdpwm,
+                    "enter_progress_pct": enter_prog,
+                    "exit_progress_pct": exit_prog,
+                    "abs_error_c": abs_err,
+                    "run_state": run_state,
+                    "fan_inverted": 1 if fan_inv_state == "1" else 0,
+                }
+            )
 
             next_t = 0.0 if not self.times else self.times[-1] + 0.5
             self.times.append(next_t)
@@ -619,9 +791,14 @@ class PIDGui:
             self.sp_var.set(cfg.group(6))
             self.alpha_var.set(cfg.group(7))
             self.maxstep_var.set(cfg.group(8))
-            self.fan_var.set(cfg.group(9))
-            self.ctrl_mode_var.set(cfg.group(10))
-            self.manpwm_var.set(cfg.group(11))
+            self.entercnt_var.set(cfg.group(9))
+            self.exitcnt_var.set(cfg.group(10))
+            self.fan_var.set(cfg.group(11))
+            self.fan_inv_var.set(cfg.group(12) == "1")
+            self.ctrl_mode_var.set(cfg.group(13))
+            self.manpwm_var.set(cfg.group(14))
+            self.run_live_var.set(cfg.group(15))
+            self.fan_inv_live_var.set("Yes" if cfg.group(12) == "1" else "No")
             self._save_state()
 
     def _append_log(self, text: str) -> None:
