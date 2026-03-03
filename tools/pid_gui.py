@@ -30,12 +30,17 @@ TELEMETRY_RE = re.compile(
     r"Temp:\s*([-+]?\d*\.?\d+)\D+"
     r"Smooth:\s*([-+]?\d*\.?\d+)\D+"
     r"PWM:\s*([-+]?\d+)\D+"
+    r"(?:P:\s*([-+]?\d*\.?\d+)\D+)?"
+    r"(?:I:\s*([-+]?\d*\.?\d+)\D+)?"
+    r"(?:D:\s*([-+]?\d*\.?\d+)\D+)?"
+    r"(?:OUT:\s*([-+]?\d*\.?\d+)\D+)?"
     r"(?:BIAS:\s*([-+]?\d*\.?\d+)\D+)?"
     r"(?:SPBIAS:\s*([-+]?\d*\.?\d+)\D+)?"
     r"SP:\s*([-+]?\d*\.?\d+)\D+"
     r"(?:EFFSP:\s*([-+]?\d*\.?\d+)\D+)?"
     r"FAN:\s*([-+]?\d*\.?\d+)\D+"
     r"FANPWM:\s*([-+]?\d+)"
+    r"(?:\D+MODE:\s*(AUTO|MANUAL|SMART)\D+STATE:\s*(PID|HOLD|MANUAL)\D+MANPWM:\s*([-+]?\d*\.?\d+)\D+HOLDPWM:\s*([-+]?\d*\.?\d+)\D+ENTPROG:\s*([-+]?\d*\.?\d+)\D+EXTPROG:\s*([-+]?\d*\.?\d+)\D+EABS:\s*([-+]?\d*\.?\d+))?"
 )
 CFG_RE = re.compile(
     r"CFG\s+KP:\s*([-+]?\d*\.?\d+)\s*\|\s*"
@@ -46,7 +51,9 @@ CFG_RE = re.compile(
     r"SP:\s*([-+]?\d*\.?\d+)\s*\|\s*"
     r"ALPHA:\s*([-+]?\d*\.?\d+)\s*\|\s*"
     r"MAXSTEP:\s*([-+]?\d+)\s*\|\s*"
-    r"FAN:\s*([-+]?\d*\.?\d+)"
+    r"FAN:\s*([-+]?\d*\.?\d+)\s*\|\s*"
+    r"MODE:\s*(AUTO|MANUAL|SMART)\s*\|\s*"
+    r"MANPWM:\s*([-+]?\d*\.?\d+)"
 )
 
 
@@ -78,6 +85,8 @@ class PIDGui:
         self.alpha_var = tk.StringVar(value=self._state_value("alpha", "0.25"))
         self.maxstep_var = tk.StringVar(value=self._state_value("maxstep", "15"))
         self.fan_var = tk.StringVar(value=self._state_value("fan", "0"))
+        self.manpwm_var = tk.StringVar(value=self._state_value("manpwm", "0.0"))
+        self.ctrl_mode_var = tk.StringVar(value=self._state_value("ctrl_mode", "AUTO"))
 
         self.raw_temp_var = tk.StringVar(value="-")
         self.temp_var = tk.StringVar(value="-")
@@ -87,8 +96,19 @@ class PIDGui:
         self.sp_live_var = tk.StringVar(value="-")
         self.effsp_live_var = tk.StringVar(value="-")
         self.pwm_var = tk.StringVar(value="-")
+        self.p_term_var = tk.StringVar(value="-")
+        self.i_term_var = tk.StringVar(value="-")
+        self.d_term_var = tk.StringVar(value="-")
+        self.out_var = tk.StringVar(value="-")
         self.fan_speed_var = tk.StringVar(value="-")
         self.fan_pwm_var = tk.StringVar(value="-")
+        self.mode_live_var = tk.StringVar(value="-")
+        self.state_live_var = tk.StringVar(value="-")
+        self.manpwm_live_var = tk.StringVar(value="-")
+        self.holdpwm_live_var = tk.StringVar(value="-")
+        self.enter_prog_live_var = tk.StringVar(value="-")
+        self.exit_prog_live_var = tk.StringVar(value="-")
+        self.abs_err_live_var = tk.StringVar(value="-")
 
         self.show_raw_var = tk.BooleanVar(value=True)
         self.show_temp_var = tk.BooleanVar(value=True)
@@ -96,6 +116,13 @@ class PIDGui:
         self.show_sp_var = tk.BooleanVar(value=True)
         self.show_pwm_var = tk.BooleanVar(value=True)
         self.show_fan_pwm_var = tk.BooleanVar(value=False)
+        self.show_p_var = tk.BooleanVar(value=False)
+        self.show_i_var = tk.BooleanVar(value=False)
+        self.show_d_var = tk.BooleanVar(value=False)
+        self.show_out_var = tk.BooleanVar(value=False)
+        self.show_holdpwm_var = tk.BooleanVar(value=False)
+        self.show_enter_prog_var = tk.BooleanVar(value=False)
+        self.show_exit_prog_var = tk.BooleanVar(value=False)
 
         self.mode_var = tk.StringVar(value="rolling")
         self.auto_scroll_var = tk.BooleanVar(value=True)
@@ -109,6 +136,13 @@ class PIDGui:
         self.smooth_values: list[float] = []
         self.sp_values: list[float] = []
         self.pwm_values: list[float] = []
+        self.p_term_values: list[float] = []
+        self.i_term_values: list[float] = []
+        self.d_term_values: list[float] = []
+        self.out_values: list[float] = []
+        self.holdpwm_values: list[float] = []
+        self.enter_prog_values: list[float] = []
+        self.exit_prog_values: list[float] = []
         self.fan_pwm_values: list[float] = []
 
         self.plot_dirty = False
@@ -151,6 +185,8 @@ class PIDGui:
             "alpha": self.alpha_var.get().strip(),
             "maxstep": self.maxstep_var.get().strip(),
             "fan": self.fan_var.get().strip(),
+            "manpwm": self.manpwm_var.get().strip(),
+            "ctrl_mode": self.ctrl_mode_var.get().strip(),
         }
         try:
             self.state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
@@ -205,9 +241,18 @@ class PIDGui:
         self._param_row(param_frame, 6, "ALPHA", self.alpha_var)
         self._param_row(param_frame, 7, "MAXSTEP", self.maxstep_var)
         self._param_row(param_frame, 8, "FAN", self.fan_var)
+        self._param_row(param_frame, 9, "MANPWM", self.manpwm_var)
+
+        mode_row = ttk.Frame(param_frame)
+        mode_row.grid(row=10, column=0, columnspan=3, sticky="w", pady=(4, 2))
+        ttk.Label(mode_row, text="MODE", width=10).pack(side="left")
+        ttk.Radiobutton(mode_row, text="AUTO", value="AUTO", variable=self.ctrl_mode_var).pack(side="left")
+        ttk.Radiobutton(mode_row, text="MANUAL", value="MANUAL", variable=self.ctrl_mode_var).pack(side="left", padx=(8, 0))
+        ttk.Radiobutton(mode_row, text="SMART", value="SMART", variable=self.ctrl_mode_var).pack(side="left", padx=(8, 0))
+        ttk.Button(mode_row, text="Set MODE", command=self._set_mode).pack(side="left", padx=(10, 0))
 
         param_buttons = ttk.Frame(param_frame)
-        param_buttons.grid(row=9, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        param_buttons.grid(row=11, column=0, columnspan=3, sticky="w", pady=(8, 0))
         ttk.Button(param_buttons, text="Apply All", command=self._apply_all).pack(side="left", padx=(0, 8))
         ttk.Button(param_buttons, text="Get From ESP32", command=self._request_get).pack(side="left")
 
@@ -222,8 +267,19 @@ class PIDGui:
         self._live_row(live, 5, "Setpoint [C]", self.sp_live_var)
         self._live_row(live, 6, "Effective SP [C]", self.effsp_live_var)
         self._live_row(live, 7, "PWM", self.pwm_var)
-        self._live_row(live, 8, "Fan Speed [%]", self.fan_speed_var)
-        self._live_row(live, 9, "Fan PWM Raw", self.fan_pwm_var)
+        self._live_row(live, 8, "P Term", self.p_term_var)
+        self._live_row(live, 9, "I Term", self.i_term_var)
+        self._live_row(live, 10, "D Term", self.d_term_var)
+        self._live_row(live, 11, "PID Output", self.out_var)
+        self._live_row(live, 12, "Fan Speed [%]", self.fan_speed_var)
+        self._live_row(live, 13, "Fan PWM Raw", self.fan_pwm_var)
+        self._live_row(live, 14, "Controller Mode", self.mode_live_var)
+        self._live_row(live, 15, "Controller State", self.state_live_var)
+        self._live_row(live, 16, "Manual PWM Cmd", self.manpwm_live_var)
+        self._live_row(live, 17, "Smart Hold PWM", self.holdpwm_live_var)
+        self._live_row(live, 18, "Enter Progress [%]", self.enter_prog_live_var)
+        self._live_row(live, 19, "Exit Progress [%]", self.exit_prog_live_var)
+        self._live_row(live, 20, "Abs Error [C]", self.abs_err_live_var)
 
         plot_controls = ttk.LabelFrame(self.content, text="Plot Controls", padding=10)
         plot_controls.pack(fill="x", pady=(0, 8))
@@ -237,6 +293,13 @@ class PIDGui:
         ttk.Checkbutton(series_frame, text="SP", variable=self.show_sp_var, command=self._mark_plot_dirty).pack(anchor="w")
         ttk.Checkbutton(series_frame, text="PWM", variable=self.show_pwm_var, command=self._mark_plot_dirty).pack(anchor="w")
         ttk.Checkbutton(series_frame, text="Fan PWM", variable=self.show_fan_pwm_var, command=self._mark_plot_dirty).pack(anchor="w")
+        ttk.Checkbutton(series_frame, text="P term", variable=self.show_p_var, command=self._mark_plot_dirty).pack(anchor="w")
+        ttk.Checkbutton(series_frame, text="I term", variable=self.show_i_var, command=self._mark_plot_dirty).pack(anchor="w")
+        ttk.Checkbutton(series_frame, text="D term", variable=self.show_d_var, command=self._mark_plot_dirty).pack(anchor="w")
+        ttk.Checkbutton(series_frame, text="PID out", variable=self.show_out_var, command=self._mark_plot_dirty).pack(anchor="w")
+        ttk.Checkbutton(series_frame, text="Hold PWM", variable=self.show_holdpwm_var, command=self._mark_plot_dirty).pack(anchor="w")
+        ttk.Checkbutton(series_frame, text="Enter %", variable=self.show_enter_prog_var, command=self._mark_plot_dirty).pack(anchor="w")
+        ttk.Checkbutton(series_frame, text="Exit %", variable=self.show_exit_prog_var, command=self._mark_plot_dirty).pack(anchor="w")
 
         mode_frame = ttk.Frame(plot_controls)
         mode_frame.grid(row=0, column=1, padx=(0, 20), sticky="nw")
@@ -403,6 +466,16 @@ class PIDGui:
         self._set_param("ALPHA", self.alpha_var)
         self._set_param("MAXSTEP", self.maxstep_var)
         self._set_param("FAN", self.fan_var)
+        self._set_param("MANPWM", self.manpwm_var)
+        self._set_mode()
+
+    def _set_mode(self) -> None:
+        value = self.ctrl_mode_var.get().strip().upper()
+        if value not in {"AUTO", "MANUAL", "SMART"}:
+            messagebox.showerror("Invalid MODE", "Mode must be AUTO, MANUAL, or SMART.")
+            return
+        self._save_state()
+        self._send_command(f"SET MODE {value}")
 
     def _request_get(self) -> None:
         self._send_command("GET")
@@ -455,12 +528,43 @@ class PIDGui:
             temp = float(telemetry.group(2))
             smooth = float(telemetry.group(3))
             pwm = float(telemetry.group(4))
-            bias = float(telemetry.group(5) or 0.0)
-            spbias = float(telemetry.group(6) or 0.0)
-            sp = float(telemetry.group(7))
-            effsp = float(telemetry.group(8) or sp + spbias)
-            fan_speed = float(telemetry.group(9))
-            fan_pwm = float(telemetry.group(10))
+            p_term = float(telemetry.group(5) or 0.0)
+            i_term = float(telemetry.group(6) or 0.0)
+            d_term = float(telemetry.group(7) or 0.0)
+            out = float(telemetry.group(8) or pwm)
+            bias = float(telemetry.group(9) or 0.0)
+            spbias = float(telemetry.group(10) or 0.0)
+            sp = float(telemetry.group(11))
+            effsp = float(telemetry.group(12) or sp + spbias)
+            fan_speed = float(telemetry.group(13))
+            fan_pwm = float(telemetry.group(14))
+            ctrl_mode = telemetry.group(15) or self.ctrl_mode_var.get().strip().upper() or "AUTO"
+            ctrl_state = telemetry.group(16) or ("MANUAL" if ctrl_mode == "MANUAL" else "PID")
+            manpwm_text = telemetry.group(17) or self.manpwm_var.get().strip() or "0"
+            holdpwm_text = telemetry.group(18) or "0"
+            enter_prog_text = telemetry.group(19) or "0"
+            exit_prog_text = telemetry.group(20) or "0"
+            abs_err_text = telemetry.group(21) or "0"
+            try:
+                manpwm = float(manpwm_text)
+            except ValueError:
+                manpwm = 0.0
+            try:
+                holdpwm = float(holdpwm_text)
+            except ValueError:
+                holdpwm = 0.0
+            try:
+                enter_prog = float(enter_prog_text)
+            except ValueError:
+                enter_prog = 0.0
+            try:
+                exit_prog = float(exit_prog_text)
+            except ValueError:
+                exit_prog = 0.0
+            try:
+                abs_err = float(abs_err_text)
+            except ValueError:
+                abs_err = 0.0
 
             self.raw_temp_var.set(f"{raw:.2f}")
             self.temp_var.set(f"{temp:.2f}")
@@ -470,8 +574,19 @@ class PIDGui:
             self.sp_live_var.set(f"{sp:.2f}")
             self.effsp_live_var.set(f"{effsp:.2f}")
             self.pwm_var.set(f"{pwm:.0f}")
+            self.p_term_var.set(f"{p_term:.2f}")
+            self.i_term_var.set(f"{i_term:.2f}")
+            self.d_term_var.set(f"{d_term:.2f}")
+            self.out_var.set(f"{out:.2f}")
             self.fan_speed_var.set(f"{fan_speed:.1f}")
             self.fan_pwm_var.set(f"{fan_pwm:.0f}")
+            self.mode_live_var.set(ctrl_mode)
+            self.state_live_var.set(ctrl_state)
+            self.manpwm_live_var.set(f"{manpwm:.0f}")
+            self.holdpwm_live_var.set(f"{holdpwm:.2f}")
+            self.enter_prog_live_var.set(f"{enter_prog:.1f}")
+            self.exit_prog_live_var.set(f"{exit_prog:.1f}")
+            self.abs_err_live_var.set(f"{abs_err:.2f}")
 
             next_t = 0.0 if not self.times else self.times[-1] + 0.5
             self.times.append(next_t)
@@ -480,6 +595,13 @@ class PIDGui:
             self.smooth_values.append(smooth)
             self.sp_values.append(sp)
             self.pwm_values.append(pwm)
+            self.p_term_values.append(p_term)
+            self.i_term_values.append(i_term)
+            self.d_term_values.append(d_term)
+            self.out_values.append(out)
+            self.holdpwm_values.append(holdpwm)
+            self.enter_prog_values.append(enter_prog)
+            self.exit_prog_values.append(exit_prog)
             self.fan_pwm_values.append(fan_pwm)
 
             self._trim_history()
@@ -498,6 +620,8 @@ class PIDGui:
             self.alpha_var.set(cfg.group(7))
             self.maxstep_var.set(cfg.group(8))
             self.fan_var.set(cfg.group(9))
+            self.ctrl_mode_var.set(cfg.group(10))
+            self.manpwm_var.set(cfg.group(11))
             self._save_state()
 
     def _append_log(self, text: str) -> None:
@@ -547,6 +671,13 @@ class PIDGui:
         self.smooth_values.clear()
         self.sp_values.clear()
         self.pwm_values.clear()
+        self.p_term_values.clear()
+        self.i_term_values.clear()
+        self.d_term_values.clear()
+        self.out_values.clear()
+        self.holdpwm_values.clear()
+        self.enter_prog_values.clear()
+        self.exit_prog_values.clear()
         self.fan_pwm_values.clear()
         self.offset_var.set(0.0)
         self._sync_offset_scale()
@@ -569,6 +700,13 @@ class PIDGui:
         del self.smooth_values[:drop]
         del self.sp_values[:drop]
         del self.pwm_values[:drop]
+        del self.p_term_values[:drop]
+        del self.i_term_values[:drop]
+        del self.d_term_values[:drop]
+        del self.out_values[:drop]
+        del self.holdpwm_values[:drop]
+        del self.enter_prog_values[:drop]
+        del self.exit_prog_values[:drop]
         del self.fan_pwm_values[:drop]
 
     def _sync_offset_scale(self) -> None:
@@ -612,6 +750,13 @@ class PIDGui:
         smooth = self.smooth_values
         sp = self.sp_values
         pwm = self.pwm_values
+        p_term = self.p_term_values
+        i_term = self.i_term_values
+        d_term = self.d_term_values
+        out = self.out_values
+        holdpwm = self.holdpwm_values
+        enter_prog = self.enter_prog_values
+        exit_prog = self.exit_prog_values
         fan_pwm = self.fan_pwm_values
 
         x_min, x_max = t[0], t[-1]
@@ -645,6 +790,20 @@ class PIDGui:
             self.ax_pwm.plot(t, pwm, color="#ff7f0e", linewidth=1.2, label="PWM")
         if self.show_fan_pwm_var.get():
             self.ax_pwm.plot(t, fan_pwm, color="#17becf", linewidth=1.2, linestyle="--", label="Fan PWM")
+        if self.show_p_var.get():
+            self.ax_pwm.plot(t, p_term, color="#8c564b", linewidth=1.2, linestyle="-.", label="P")
+        if self.show_i_var.get():
+            self.ax_pwm.plot(t, i_term, color="#bcbd22", linewidth=1.2, linestyle="-.", label="I")
+        if self.show_d_var.get():
+            self.ax_pwm.plot(t, d_term, color="#7f7f7f", linewidth=1.2, linestyle="-.", label="D")
+        if self.show_out_var.get():
+            self.ax_pwm.plot(t, out, color="#e377c2", linewidth=1.2, linestyle="--", label="PID OUT")
+        if self.show_holdpwm_var.get():
+            self.ax_pwm.plot(t, holdpwm, color="#ff1493", linewidth=1.2, linestyle=":", label="HOLD PWM")
+        if self.show_enter_prog_var.get():
+            self.ax_pwm.plot(t, enter_prog, color="#005f73", linewidth=1.2, linestyle="-", label="ENTER %")
+        if self.show_exit_prog_var.get():
+            self.ax_pwm.plot(t, exit_prog, color="#ca6702", linewidth=1.2, linestyle="-", label="EXIT %")
 
         self.ax_temp.set_xlabel("Time [s]")
         self.ax_temp.set_ylabel("Temperature [C]")
