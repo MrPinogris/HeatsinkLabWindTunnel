@@ -5,4 +5,5 @@
 .vscode/ipch
 logs
 tools/pid_gui_state.json
+Excel
 
