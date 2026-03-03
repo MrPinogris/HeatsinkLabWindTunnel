@@ -1,5 +1,77 @@
 ## PID GUI Ideas (Student Lab Focus)
 
+## Prioritization Framework
+
+Use this scoring model for each backlog item:
+
+- `Importance` (1..5): impact on heatsink-comparison quality.
+- `Necessity` (1..5): required for a usable student lab workflow.
+- `Dependency` (0 or 1): blocks other high-value work.
+- `Effort` (1..5): engineering cost/complexity.
+- `Score = 2*Importance + 2*Necessity + 2*Dependency - Effort`
+
+Sort by highest `Score` first.
+
+## Backlog Template
+
+Copy this block for each candidate feature:
+
+```text
+Title:
+Goal:
+Category: [GUI | Firmware | Data | Safety | Analysis | Reporting]
+
+Importance (1-5):
+Necessity (1-5):
+Dependency (0/1):
+Effort (1-5):
+Score:
+
+Dependencies:
+Acceptance Criteria:
+- ...
+- ...
+
+Notes:
+```
+
+## Suggested Priorities (Given Current Project Goal)
+
+### P0 (Now)
+
+1. Structured experiment workflow
+- Add phase markers/events in graph + CSV.
+- Add core auto-metrics (rise time, settling, overshoot, steady-state error).
+
+2. Stable/upgrade-proof data model
+- Introduce schema versioning (`schema_version`) and run metadata (`run_id`, `heatsink_id`).
+- Keep placeholders for upcoming sensors.
+
+3. Safety + reproducibility baseline
+- Ensure `RUN ON/OFF`, sensor-fault behavior, and configuration capture per run.
+
+### P1 (Power Sensor Arrival)
+
+1. Add power telemetry
+- Log `voltage`, `current`, `power_in`.
+
+2. Equilibrium/dissipation analysis
+- Detect steady state and estimate dissipation from power balance.
+
+3. Comparison KPIs
+- Per-run summary for heatsink ranking under same conditions.
+
+### P2 (Pressure + Airspeed Sensor Arrival)
+
+1. Airflow telemetry
+- Log `airspeed` and `delta_p`.
+
+2. Closed-loop airspeed control
+- Add a fan control loop to maintain target airspeed.
+
+3. Condition lock for fair comparison
+- Test at fixed setpoint + fixed airspeed + recorded pressure drop.
+
 1. Experiment Presets
 - Save/load full test setups (SP, mode, gains, fan, thresholds, y-scale).
 - One-click presets like `Step Response`, `Disturbance Test`, `Manual Bias Find`.
