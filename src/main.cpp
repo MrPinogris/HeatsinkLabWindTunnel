@@ -8,15 +8,13 @@
 
 // ---------------- PIN DEFINITIES ----------------
 const int heaterMosfetPin = 9;
-const int fanPwmPin = 8;
+const int fanPwmPin = 5;
 
-const int thermocoupleSCK = 12;
-const int thermocoupleCS  = 11;
-const int thermocoupleSO  = 10;
+const int thermocoupleSCK = 13;
+const int thermocoupleCS  = 12;
+const int thermocoupleSO  = 11;
 
 // ---------------- PWM INSTELLINGEN ----------------
-const int heaterPwmChannel = 0;
-const int fanPwmChannel = 1;
 const int pwmFreq = 500;
 const int pwmResolution = 8;
 
@@ -88,7 +86,7 @@ int ditheredPwmFromTarget(float targetPwm);
 void setPWM(int duty)
 {
   duty = constrain(duty, 0, 255);
-  ledcWrite(heaterPwmChannel, duty);
+  ledcWrite(heaterMosfetPin, duty);
 }
 
 int fanPercentToRaw(float percent) {
@@ -105,10 +103,10 @@ void setFanSpeedPercent(float percent) {
   fanSpeedPercent = constrain(percent, 0.0f, 100.0f);
   fanPwmRaw = fanPercentToRaw(fanSpeedPercent);
   if (controlEnabled) {
-    ledcWrite(fanPwmChannel, fanPwmRaw);
+    ledcWrite(fanPwmPin, fanPwmRaw);
     fanPwmApplied = fanPwmRaw;
   } else {
-    ledcWrite(fanPwmChannel, 0);
+    ledcWrite(fanPwmPin, 0);
     fanPwmApplied = 0;
   }
 }
@@ -412,7 +410,7 @@ void handleCommand(char *line) {
     } else if (strcmp(valueText, "OFF") == 0) {
       controlEnabled = false;
       setPWM(0);
-      ledcWrite(fanPwmChannel, 0);
+      ledcWrite(fanPwmPin, 0);
       fanPwmApplied = 0;
       pid.reset();
       resetSmartState();
@@ -540,10 +538,8 @@ void setup()
   preferences.begin("heatctl", false);
   loadConfigFromNvs();
 
-  ledcSetup(heaterPwmChannel, pwmFreq, pwmResolution);
-  ledcAttachPin(heaterMosfetPin, heaterPwmChannel);
-  ledcSetup(fanPwmChannel, pwmFreq, pwmResolution);
-  ledcAttachPin(fanPwmPin, fanPwmChannel);
+  ledcAttach(heaterMosfetPin, pwmFreq, pwmResolution);
+  ledcAttach(fanPwmPin, pwmFreq, pwmResolution);
 
   setPWM(0);
   setFanSpeedPercent(fanSpeedPercent);
@@ -570,7 +566,7 @@ void loop() {
   float t = readTempFiltered(rawTemp);
   if (isnan(t)) {
     setPWM(0);
-    ledcWrite(fanPwmChannel, 0);
+    ledcWrite(fanPwmPin, 0);
     fanPwmApplied = 0;
     pid.reset();
     resetSmartState();
@@ -580,7 +576,7 @@ void loop() {
 
   if (stuckDetected(t)) {
     setPWM(0);
-    ledcWrite(fanPwmChannel, 0);
+    ledcWrite(fanPwmPin, 0);
     fanPwmApplied = 0;
     pid.reset();
     resetSmartState();
@@ -607,7 +603,7 @@ void loop() {
   if (!controlEnabled) {
     pwm = 0;
     setPWM(0);
-    ledcWrite(fanPwmChannel, 0);
+    ledcWrite(fanPwmPin, 0);
     fanPwmApplied = 0;
     smartHoldActive = false;
     smartStableCount = 0;
