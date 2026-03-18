@@ -159,6 +159,16 @@ class AppState:
     def connect(self, port: str, baud: int) -> tuple[bool, str]:
         if self.connected:
             return False, "Already connected"
+        # Signal any lingering reader thread to exit (don't join — it's a daemon)
+        self.reader_stop.set()
+        self.reader_thread = None
+        # Close any leftover serial port
+        if self.serial_conn:
+            try:
+                self.serial_conn.close()
+            except Exception:
+                pass
+            self.serial_conn = None
         try:
             self.serial_conn = serial.Serial()
             self.serial_conn.port = port
@@ -242,7 +252,17 @@ class AppState:
                     self.broadcast_sync({"type": "handshake_ok"})
                 elif time.monotonic() > self.handshake_deadline:
                     self.awaiting_handshake = False
+                    self.connected = False
+                    self.reader_stop.set()
+                    if self.serial_conn:
+                        try:
+                            self.serial_conn.close()
+                        except Exception:
+                            pass
+                        self.serial_conn = None
                     self.broadcast_sync({"type": "handshake_fail"})
+                    self.broadcast_sync({"type": "disconnected", "reason": "handshake_fail"})
+                    break
 
     def _handle_line(self, line: str) -> None:
         m = TELEMETRY_RE.search(line)
@@ -447,7 +467,18 @@ async def list_ports() -> JSONResponse:
 async def connect(payload: dict) -> JSONResponse:
     port = payload.get("port", "")
     baud = int(payload.get("baud", 115200))
-    ok, msg = state.connect(port, baud)
+    loop = asyncio.get_event_loop()
+    try:
+        ok, msg = await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: state.connect(port, baud)),
+            timeout=5.0
+        )
+    except asyncio.TimeoutError:
+        state.connected = False
+        state.serial_conn = None
+        ok, msg = False, f"Timed out opening {port} — wrong port or device busy"
+    if ok:
+        await state.broadcast({"type": "connected", "port": port, "baud": baud})
     return JSONResponse({"ok": ok, "msg": msg})
 
 
