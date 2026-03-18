@@ -7,12 +7,12 @@
 #include <string.h>
 
 // ---------------- PIN DEFINITIES ----------------
-const int heaterMosfetPin = 9;
-const int fanPwmPin = 8;
+const int heaterMosfetPin = 4;
+const int fanPwmPin = 5;
 
-const int thermocoupleSCK = 12;
-const int thermocoupleCS  = 11;
-const int thermocoupleSO  = 10;
+const int thermocoupleSCK = 13;
+const int thermocoupleCS  = 12;
+const int thermocoupleSO  = 11;
 
 // ---------------- PWM INSTELLINGEN ----------------
 const int heaterPwmChannel = 0;
