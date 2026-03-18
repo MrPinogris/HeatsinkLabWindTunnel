@@ -5,6 +5,8 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <Wire.h>
+#include "INA226.h"
 
 // ---------------- PIN DEFINITIES ----------------
 const int heaterMosfetPin = 4;
@@ -14,14 +16,18 @@ const int thermocoupleSCK = 13;
 const int thermocoupleCS  = 12;
 const int thermocoupleSO  = 11;
 
+const int i2cSdaPin = 15;
+const int i2cSclPin = 16;
+
 // ---------------- PWM INSTELLINGEN ----------------
 const int heaterPwmChannel = 0;
-const int fanPwmChannel = 1;
+const int fanPwmChannel    = 1;
 const int pwmFreq = 500;
 const int pwmResolution = 8;
 
 // ---------------- OBJECTEN ----------------
 MAX6675 thermocouple(thermocoupleSCK, thermocoupleCS, thermocoupleSO);
+INA226 ina226(0x40);
 float pidKp = 8.0f;
 float pidKi = 0.06f;
 float pidKd = 0.0f;
@@ -73,6 +79,13 @@ float lastSmoothForSlope = NAN;
 float smartEnterProgressPct = 0.0f;
 float smartExitProgressPct = 0.0f;
 int fanPwmApplied = 255;
+
+// ---------------- INA226 METINGEN ----------------
+float supplyVoltage = 12.0f; // Set to your PSU voltage
+float inaVoltage = 0.0f;   // Bus voltage in V
+float inaCurrent = 0.0f;   // Current in A
+float inaPower   = 0.0f;   // Power in W
+bool  inaOk      = false;
 
 void saveConfigToNvs();
 void loadConfigFromNvs();
@@ -540,6 +553,18 @@ void setup()
   preferences.begin("heatctl", false);
   loadConfigFromNvs();
 
+  Wire.begin(i2cSdaPin, i2cSclPin);
+  inaOk = ina226.begin();
+  if (inaOk) {
+    ina226.setMaxCurrentShunt(2.0f, 0.0353f); // 2A max, ~35.3mOhm actual shunt — limit: shunt*max <= 81.92mV
+    ina226.setAverage(INA226_1024_SAMPLES);  // average over many samples for PWM accuracy
+    ina226.setShuntVoltageConversionTime(INA226_8300_us);
+    ina226.setBusVoltageConversionTime(INA226_8300_us);
+    Serial.println("INA226 OK");
+  } else {
+    Serial.println("INA226 NOT FOUND – check wiring");
+  }
+
   ledcSetup(heaterPwmChannel, pwmFreq, pwmResolution);
   ledcAttachPin(heaterMosfetPin, heaterPwmChannel);
   ledcSetup(fanPwmChannel, pwmFreq, pwmResolution);
@@ -565,6 +590,12 @@ void loop() {
     return;
   }
   lastControlMs = now;
+
+  if (inaOk) {
+    inaVoltage = supplyVoltage;
+    inaCurrent = ina226.getCurrent();
+    inaPower   = inaVoltage * inaCurrent;
+  }
 
   float rawTemp = thermocouple.readCelsius();
   float t = readTempFiltered(rawTemp);
@@ -703,8 +734,9 @@ void loop() {
     stateText = "HOLD";
   }
 
-  Serial.printf("Rawtemp %.2f C | Temp: %.2f C | Smooth: %.2f C | PWM: %d | P: %.2f | I: %.2f | D: %.2f | OUT: %.2f | BIAS: %.2f | SPBIAS: %.2f | SP: %.2f | EFFSP: %.2f | FAN: %.1f | FANPWM: %d | MODE: %s | STATE: %s | MANPWM: %.2f | HOLDPWM: %.2f | ENTPROG: %.1f | EXTPROG: %.1f | EABS: %.2f | RUN: %s | FANINV: %d\n",
+  Serial.printf("Rawtemp %.2f C | Temp: %.2f C | Smooth: %.2f C | PWM: %d | P: %.2f | I: %.2f | D: %.2f | OUT: %.2f | BIAS: %.2f | SPBIAS: %.2f | SP: %.2f | EFFSP: %.2f | FAN: %.1f | FANPWM: %d | MODE: %s | STATE: %s | MANPWM: %.2f | HOLDPWM: %.2f | ENTPROG: %.1f | EXTPROG: %.1f | EABS: %.2f | RUN: %s | FANINV: %d | V: %.3f V | I: %.4f A | W: %.3f W\n",
                 rawTemp, t, tSmooth, pwm, pTerm, iTerm, dTerm, pidOut, pidBias, setpointBias, setpoint, effectiveSetpoint, fanSpeedPercent, fanPwmApplied,
                 modeToText(controlMode), stateText, manualPwmTarget, smartHoldPwmTarget, smartEnterProgressPct, smartExitProgressPct, absError,
-                controlEnabled ? "ON" : "OFF", fanPwmInverted ? 1 : 0);
+                controlEnabled ? "ON" : "OFF", fanPwmInverted ? 1 : 0,
+                inaVoltage, inaCurrent, inaPower);
 }
