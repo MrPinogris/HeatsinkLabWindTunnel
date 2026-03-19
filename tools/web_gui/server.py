@@ -796,6 +796,21 @@ async def stop_csv() -> JSONResponse:
     return JSONResponse({"ok": True, "path": path})
 
 
+@app.get("/api/csv/download")
+async def download_csv():
+    """Stream the most recently completed (or active) CSV log file."""
+    from fastapi.responses import FileResponse as FR
+    # Prefer the active file; fall back to most recent in logs/
+    if state.csv_path and state.csv_path.exists():
+        return FR(str(state.csv_path), media_type="text/csv",
+                  filename=state.csv_path.name)
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    csvs = sorted(LOGS_DIR.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not csvs:
+        return JSONResponse({"ok": False, "msg": "No CSV files found"}, status_code=404)
+    return FR(str(csvs[0]), media_type="text/csv", filename=csvs[0].name)
+
+
 @app.get("/api/state")
 async def get_ui_state() -> JSONResponse:
     return JSONResponse(state.saved_state)
