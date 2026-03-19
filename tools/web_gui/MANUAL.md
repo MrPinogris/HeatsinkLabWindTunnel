@@ -16,16 +16,18 @@ Download from https://www.python.org/downloads/ — check **"Add Python to PATH"
 Either clone the repository or download and extract the ZIP from GitHub.
 
 ### 3. Install Python packages
-Open a terminal/command prompt in the project folder and run:
+Open a terminal/command prompt in `tools/web_gui/` and run:
 ```
-pip install fastapi uvicorn pyserial
+pip install -r requirements.txt
 ```
 
 ---
 
 ## Starting the server
 
-Navigate to `tools/web_gui/` and run:
+**Windows (quick start):** Double-click `start.bat` inside `tools/web_gui/` — it installs dependencies and starts the server automatically.
+
+**Manual / macOS / Linux:** Navigate to `tools/web_gui/` and run:
 ```
 python server.py
 ```
