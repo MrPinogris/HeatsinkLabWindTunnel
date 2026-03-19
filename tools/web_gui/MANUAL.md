@@ -16,9 +16,9 @@ Download from https://www.python.org/downloads/ — check **"Add Python to PATH"
 Either clone the repository or download and extract the ZIP from GitHub.
 
 ### 3. Install Python packages
-Open a terminal/command prompt in the project folder and run:
+Open a terminal/command prompt in the `tools/web_gui/` folder and run:
 ```
-pip install fastapi uvicorn pyserial
+python -m pip install -r requirements.txt
 ```
 
 ---
