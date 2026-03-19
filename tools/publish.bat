@@ -39,6 +39,7 @@ xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\server.py"          "%TEMP_DIR%\tools\
 xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\requirements.txt"   "%TEMP_DIR%\tools\web_gui\"
 xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\static\index.html"  "%TEMP_DIR%\tools\web_gui\static\"
 xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\MANUAL.md"          "%TEMP_DIR%\tools\web_gui\"
+xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\start.bat"          "%TEMP_DIR%\tools\web_gui\"
 
 :: Write a trimmed .gitignore for the public repo
 (
