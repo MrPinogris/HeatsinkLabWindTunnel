@@ -102,6 +102,7 @@ class AppState:
         self.ws_lock = asyncio.Lock()
 
         self.loop: asyncio.AbstractEventLoop | None = None
+        self._virt: "VirtualMCU | None" = None
 
         # Latest telemetry snapshot
         self.last_telemetry: dict[str, Any] = {}
@@ -169,6 +170,17 @@ class AppState:
             except Exception:
                 pass
             self.serial_conn = None
+
+        # Virtual port — no real serial needed
+        if port == "VIRTUAL":
+            self.port = "VIRTUAL"
+            self.baud = baud
+            self.connected = True
+            self._virt = VirtualMCU(self)
+            self._virt.start()
+            self.broadcast_sync({"type": "handshake_ok"})
+            return True, "Connected to VIRTUAL simulator"
+
         try:
             self.serial_conn = serial.Serial()
             self.serial_conn.port = port
@@ -195,6 +207,9 @@ class AppState:
             return False, str(exc)
 
     def disconnect(self) -> None:
+        if self._virt:
+            self._virt.stop()
+            self._virt = None
         self.reader_stop.set()
         self.connected = False
         self.awaiting_handshake = False
@@ -219,8 +234,11 @@ class AppState:
             return False, str(exc)
 
     def send_command(self, command: str) -> tuple[bool, str]:
-        ok, msg = self._write_serial(command)
         self.broadcast_sync({"type": "log", "text": f"> {command}"})
+        if self._virt:
+            self._virt.handle_command(command)
+            return True, "OK"
+        ok, msg = self._write_serial(command)
         return ok, msg
 
     # ------------------------------------------------------------------
@@ -431,6 +449,187 @@ class AppState:
         self.csv_path = None
 
 
+# ---------------------------------------------------------------------------
+# Virtual MCU simulator
+# ---------------------------------------------------------------------------
+import random
+
+class VirtualMCU:
+    """Simulates the ESP32 heater controller over a fake serial connection."""
+
+    def __init__(self, app_state: "AppState") -> None:
+        self._state = app_state
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+        # Simulated controller state
+        self.sp = 60.0
+        self.kp = 8.0
+        self.ki = 0.06
+        self.kd = 0.0
+        self.bias = 0.0
+        self.spbias = 0.0
+        self.alpha = 0.1
+        self.maxstep = 20
+        self.entercnt = 30
+        self.exitcnt = 10
+        self.fan = 0.4
+        self.fan_inv = 0
+        self.mode = "SMART"
+        self.manpwm = 30.0
+        self.run = "ON"
+
+        # Physics state
+        self._temp = 20.0
+        self._smooth = 20.0
+        self._pwm = 0.0
+        self._i_term = 0.0
+        self._holdpwm = 0.0
+        self._ctrl_state = "PID"
+        self._enter_prog = 0.0
+        self._exit_prog = 0.0
+        self._t = 0.0
+
+        self.speed = 1  # 1=realtime, 5=5x faster, etc.
+
+        # Ambient / heater physics constants
+        # Calibrated from real CSV: reaches 60°C in ~163s at PWM=255 from 21.5°C
+        self._ambient = 20.0
+        self._thermal_mass = 62.5    # J/°C  (gives initial rate 0.24°C/s at 15W)
+        self._heater_power = 15.0    # max watts at PWM=255
+        self._cooling_coeff = 0.002  # natural convection, small (heatsink can reach ~140°C at full power)
+
+    def start(self) -> None:
+        self._stop.clear()
+        # Send initial CFG line
+        self._broadcast_cfg()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def handle_command(self, cmd: str) -> None:
+        cmd = cmd.strip().upper()
+        if cmd == "GET":
+            self._broadcast_cfg()
+            return
+        parts = cmd.split()
+        if len(parts) == 3 and parts[0] == "SET":
+            key, val = parts[1], parts[2]
+            try:
+                if key == "SP":       self.sp      = float(val)
+                elif key == "KP":     self.kp      = float(val)
+                elif key == "KI":     self.ki      = float(val)
+                elif key == "KD":     self.kd      = float(val)
+                elif key == "BIAS":   self.bias     = float(val)
+                elif key == "SPBIAS": self.spbias   = float(val)
+                elif key == "ALPHA":  self.alpha    = float(val)
+                elif key == "MAXSTEP":self.maxstep  = int(float(val))
+                elif key == "ENTERCNT":self.entercnt= int(float(val))
+                elif key == "EXITCNT": self.exitcnt = int(float(val))
+                elif key == "FAN":    self.fan      = float(val) / 100.0
+                elif key == "FANINV": self.fan_inv  = int(val)
+                elif key == "MODE":
+                    if val in ("AUTO", "MANUAL", "SMART"):
+                        self.mode = val
+                elif key == "MANPWM": self.manpwm   = float(val)
+                elif key == "RUN":
+                    if val in ("ON", "OFF"):
+                        self.run = val
+                self._state.broadcast_sync({"type": "log", "text": f"OK {key} set to {val}"})
+                self._broadcast_cfg()
+            except ValueError:
+                self._state.broadcast_sync({"type": "log", "text": f"ERR bad value for {key}"})
+
+    def _broadcast_cfg(self) -> None:
+        line = (
+            f"CFG KP: {self.kp:.3f} | KI: {self.ki:.3f} | KD: {self.kd:.3f} | "
+            f"BIAS: {self.bias:.2f} | SPBIAS: {self.spbias:.2f} | SP: {self.sp:.2f} | "
+            f"ALPHA: {self.alpha:.3f} | MAXSTEP: {self.maxstep} | ENTCNT: {self.entercnt} | "
+            f"EXTCNT: {self.exitcnt} | FAN: {self.fan*100:.1f} | FANINV: {self.fan_inv} | "
+            f"MODE: {self.mode} | MANPWM: {self.manpwm:.2f} | RUN: {self.run}"
+        )
+        self._state.broadcast_sync({"type": "log", "text": line})
+        self._state._handle_line(line)
+
+    def _loop(self) -> None:
+        dt_s = 1.0  # fixed physics step (1 simulated second per tick)
+        prev_err = 0.0
+        while not self._stop.is_set():
+            time.sleep(max(0.05, 1.0 / self.speed))
+            if self._stop.is_set():
+                break
+
+            effsp = self.sp + self.spbias
+            err = effsp - self._temp
+
+            # PID
+            p = self.kp * err
+            self._i_term += self.ki * err * dt_s
+            self._i_term = max(-255.0, min(255.0, self._i_term))
+            d = self.kd * (err - prev_err) / dt_s
+            prev_err = err
+            pid_out = p + self._i_term + d + self.bias
+
+            if self.run == "OFF":
+                self._pwm = 0.0
+                self._ctrl_state = "PID"
+            elif self.mode == "MANUAL":
+                self._pwm = self.manpwm
+                self._ctrl_state = "MANUAL"
+            elif self.mode == "SMART":
+                # simple smart: hold when stable, PID otherwise
+                abs_err = abs(err)
+                if abs_err < 1.0:
+                    self._enter_prog = min(1.0, self._enter_prog + 1.0 / self.entercnt)
+                else:
+                    self._enter_prog = 0.0
+                if self._enter_prog >= 1.0:
+                    self._holdpwm = self._pwm
+                    self._ctrl_state = "HOLD"
+                    self._pwm = self._holdpwm
+                else:
+                    self._ctrl_state = "PID"
+                    self._pwm = max(0.0, min(255.0, pid_out))
+            else:  # AUTO
+                self._pwm = max(0.0, min(255.0, pid_out))
+                self._ctrl_state = "PID"
+
+            # Physics: heater warms, ambient cools
+            power_w = (self._pwm / 255.0) * self._heater_power
+            cooling = self._cooling_coeff * (self._temp - self._ambient)
+            delta_t = (power_w / self._thermal_mass - cooling) * dt_s
+            noise = random.gauss(0, 0.05)
+            self._temp += delta_t + noise
+            self._smooth = self.alpha * self._temp + (1 - self.alpha) * self._smooth
+
+            # Simulated power (heater only, ~12V)
+            current_a = (self._pwm / 255.0) * (self._heater_power / 12.0)
+            current_a = max(0.0, current_a + random.gauss(0, 0.003))
+            voltage_v = 12.0
+            power_calc = voltage_v * current_a
+
+            fan_pwm_val = int((1.0 - self.fan) * 255) if self.fan_inv else int(self.fan * 255)
+            abs_err_val = abs(effsp - self._temp)
+
+            line = (
+                f"Rawtemp {self._temp + random.gauss(0,0.1):.2f} C | "
+                f"Temp: {self._temp:.2f} C | Smooth: {self._smooth:.2f} C | "
+                f"PWM: {int(self._pwm)} | P: {p:.2f} | I: {self._i_term:.2f} | "
+                f"D: {d:.2f} | OUT: {pid_out:.2f} | BIAS: {self.bias:.2f} | "
+                f"SPBIAS: {self.spbias:.2f} | SP: {self.sp:.2f} | EFFSP: {effsp:.2f} | "
+                f"FAN: {self.fan*100:.1f} | FANPWM: {fan_pwm_val} | "
+                f"MODE: {self.mode} | STATE: {self._ctrl_state} | "
+                f"MANPWM: {self.manpwm:.2f} | HOLDPWM: {self._holdpwm:.2f} | "
+                f"ENTPROG: {self._enter_prog*100:.1f} | EXTPROG: {self._exit_prog*100:.1f} | "
+                f"EABS: {abs_err_val:.2f} | RUN: {self.run} | FANINV: {self.fan_inv} | "
+                f"V: {voltage_v:.3f} V | I: {current_a:.4f} A | W: {power_calc:.3f} W"
+            )
+            self._state.broadcast_sync({"type": "log", "text": line})
+            self._state._handle_line(line)
+
+
 # Singleton
 state = AppState()
 
@@ -460,6 +659,7 @@ async def root() -> FileResponse:
 async def list_ports() -> JSONResponse:
     ports = [{"device": p.device, "description": p.description}
              for p in serial.tools.list_ports.comports()]
+    ports.insert(0, {"device": "VIRTUAL", "description": "Virtual simulator (no hardware needed)"})
     return JSONResponse({"ports": ports})
 
 
@@ -480,6 +680,42 @@ async def connect(payload: dict) -> JSONResponse:
     if ok:
         await state.broadcast({"type": "connected", "port": port, "baud": baud})
     return JSONResponse({"ok": ok, "msg": msg})
+
+
+@app.post("/api/virtual/speed")
+async def set_virtual_speed(payload: dict) -> JSONResponse:
+    speed = int(payload.get("speed", 1))
+    speed = max(1, min(50, speed))
+    if state._virt:
+        state._virt.speed = speed
+        return JSONResponse({"ok": True, "speed": speed})
+    return JSONResponse({"ok": False, "msg": "Not in virtual mode"})
+
+
+@app.post("/api/virtual/physics")
+async def set_virtual_physics(payload: dict) -> JSONResponse:
+    if not state._virt:
+        return JSONResponse({"ok": False, "msg": "Not in virtual mode"})
+    v = state._virt
+    try:
+        if "heater_power" in payload:  v._heater_power  = float(payload["heater_power"])
+        if "thermal_mass" in payload:  v._thermal_mass  = float(payload["thermal_mass"])
+        if "cooling_coeff" in payload: v._cooling_coeff = float(payload["cooling_coeff"])
+        if "ambient"       in payload: v._ambient       = float(payload["ambient"])
+    except (ValueError, TypeError) as e:
+        return JSONResponse({"ok": False, "msg": str(e)})
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/virtual/physics")
+async def get_virtual_physics() -> JSONResponse:
+    if not state._virt:
+        return JSONResponse({"ok": False, "msg": "Not in virtual mode"})
+    v = state._virt
+    return JSONResponse({"ok": True, "heater_power": v._heater_power,
+                         "thermal_mass": v._thermal_mass,
+                         "cooling_coeff": v._cooling_coeff,
+                         "ambient": v._ambient})
 
 
 @app.post("/api/disconnect")

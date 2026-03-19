@@ -306,6 +306,34 @@
           <button class="success small" id="btnCsvStart" onclick="startCsv()" disabled>Start CSV</button>
           <button class="small" id="btnCsvStop" onclick="stopCsv()" disabled>Stop CSV</button>
         </div>
+        <!-- Virtual speed bar (only shown when connected to VIRTUAL) -->
+        <div id="virtualBar" style="display:none;margin-top:10px;padding:8px;background:var(--surface2);border:1px solid var(--accent);border-radius:var(--radius);">
+          <div style="color:var(--accent);font-size:11px;font-weight:600;margin-bottom:6px;">⚡ VIRTUAL MODE</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+            <span style="font-size:11px;color:var(--text-muted);">Speed:</span>
+            <button class="small" onclick="setVirtSpeed(1)">1×</button>
+            <button class="small" onclick="setVirtSpeed(5)">5×</button>
+            <button class="small" onclick="setVirtSpeed(10)">10×</button>
+            <button class="small" onclick="setVirtSpeed(20)">20×</button>
+            <button class="small" onclick="setVirtSpeed(50)">50×</button>
+            <span id="virtSpeedLabel" style="font-size:11px;color:var(--text-muted);">1×</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Physics:</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;">
+            <label style="font-size:11px;color:var(--text-muted);">Heater power (W)
+              <input type="number" id="vPhysHeater" value="15" step="1" style="width:100%;margin-top:2px;" onchange="applyVirtPhysics()">
+            </label>
+            <label style="font-size:11px;color:var(--text-muted);">Thermal mass (J/°C)
+              <input type="number" id="vPhysMass" value="62.5" step="1" style="width:100%;margin-top:2px;" onchange="applyVirtPhysics()">
+            </label>
+            <label style="font-size:11px;color:var(--text-muted);">Cooling coeff (/s/°C)
+              <input type="number" id="vPhysCooling" value="0.002" step="0.0005" style="width:100%;margin-top:2px;" onchange="applyVirtPhysics()">
+            </label>
+            <label style="font-size:11px;color:var(--text-muted);">Ambient (°C)
+              <input type="number" id="vPhysAmbient" value="20" step="1" style="width:100%;margin-top:2px;" onchange="applyVirtPhysics()">
+            </label>
+          </div>
+        </div>
       </div>
 
       <!-- PID Parameters -->
@@ -767,12 +795,15 @@ function handleMsg(msg) {
   if (msg.type === 'connected') {
     serialConnected = true;
     updateConnUI(true, msg.port, msg.baud);
+    if (msg.port === 'VIRTUAL') { document.getElementById('virtualBar').style.display = 'block'; loadVirtPhysics(); }
+    else document.getElementById('virtualBar').style.display = 'none';
     return;
   }
 
   if (msg.type === 'disconnected') {
     serialConnected = false;
     updateConnUI(false, '', 0);
+    document.getElementById('virtualBar').style.display = 'none';
     return;
   }
 
@@ -937,6 +968,29 @@ async function connect() {
 
 async function disconnect() {
   await api('/api/disconnect', 'POST');
+}
+
+async function setVirtSpeed(s) {
+  await api('/api/virtual/speed', 'POST', { speed: s });
+  document.getElementById('virtSpeedLabel').textContent = s + '×';
+}
+
+async function applyVirtPhysics() {
+  await api('/api/virtual/physics', 'POST', {
+    heater_power:  parseFloat(document.getElementById('vPhysHeater').value),
+    thermal_mass:  parseFloat(document.getElementById('vPhysMass').value),
+    cooling_coeff: parseFloat(document.getElementById('vPhysCooling').value),
+    ambient:       parseFloat(document.getElementById('vPhysAmbient').value),
+  });
+}
+
+async function loadVirtPhysics() {
+  const r = await api('/api/virtual/physics', 'GET');
+  if (!r.ok) return;
+  document.getElementById('vPhysHeater').value  = r.heater_power;
+  document.getElementById('vPhysMass').value    = r.thermal_mass;
+  document.getElementById('vPhysCooling').value = r.cooling_coeff;
+  document.getElementById('vPhysAmbient').value = r.ambient;
 }
 
 async function sendCmd(cmd) {
