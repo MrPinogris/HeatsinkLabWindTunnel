@@ -493,7 +493,22 @@
           <div class="telem-item"><span class="telem-label">Abs Err °C</span><span class="telem-value warn" id="tAbsErr">-</span></div>
           <div class="telem-item"><span class="telem-label">Run State</span><span class="telem-value" id="tRun">-</span></div>
           <div class="telem-item"><span class="telem-label">Fan Inv</span><span class="telem-value" id="tFanInv">-</span></div>
+          <div class="telem-item"><span class="telem-label">Eq PWM</span><span class="telem-value" id="tEqPWM">-</span></div>
         </div>
+      </div>
+
+      <!-- Heatsink Characteristics -->
+      <div class="section">
+        <div class="section-title">Heatsink</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;margin-bottom:8px;">
+          <div class="telem-item"><span class="telem-label">R_th (°C/W)</span><span class="telem-value" id="hRth">—</span></div>
+          <div class="telem-item"><span class="telem-label">k (W/°C)</span><span class="telem-value" id="hK">—</span></div>
+          <div class="telem-item"><span class="telem-label">T_max (°C)</span><span class="telem-value warn" id="hTmax">—</span></div>
+          <div class="telem-item"><span class="telem-label">τ (s)</span><span class="telem-value" id="hTau">—</span></div>
+        </div>
+        <label style="font-size:11px;color:var(--text-muted);">Ambient (°C)
+          <input type="number" id="ambientInput" value="20" step="1" style="width:100%;margin-top:2px;" onchange="setAmbient(this.value)">
+        </label>
       </div>
 
     </div><!-- /sidebar -->
@@ -534,6 +549,7 @@
           <label class="series-check"><input type="checkbox" onchange="toggleSeries('d_term')"><span class="swatch" style="background:#e879f9"></span><span>D Term</span></label>
           <label class="series-check"><input type="checkbox" onchange="toggleSeries('pid_out')"><span class="swatch" style="background:#38bdf8"></span><span>PID Out</span></label>
           <label class="series-check"><input type="checkbox" onchange="toggleSeries('holdpwm')"><span class="swatch" style="background:#4ade80"></span><span>Hold PWM</span></label>
+          <label class="series-check"><input type="checkbox" onchange="toggleSeries('eq_pwm')"><span class="swatch" style="background:#f43f5e"></span><span>Eq PWM</span></label>
           <label class="series-check"><input type="checkbox" onchange="toggleSeries('enter_prog')"><span class="swatch" style="background:#a3e635"></span><span>Enter %</span></label>
           <label class="series-check"><input type="checkbox" onchange="toggleSeries('exit_prog')"><span class="swatch" style="background:#facc15"></span><span>Exit %</span></label>
         </div>
@@ -581,7 +597,7 @@ let wsConnected = false;
 const history = {
   ts: [], raw_temp: [], temp: [], smooth: [], sp: [],
   pwm: [], p_term: [], i_term: [], d_term: [], pid_out: [],
-  holdpwm: [], enter_prog: [], exit_prog: [], fan_pwm: []
+  holdpwm: [], enter_prog: [], exit_prog: [], fan_pwm: [], eq_pwm: []
 };
 
 let viewMode = 'rolling';
@@ -603,6 +619,7 @@ const SERIES_CFG = [
   { key: 'd_term',     label: 'D Term',    color: '#e879f9', yAxis: 'y2', hidden: true },
   { key: 'pid_out',    label: 'PID Out',   color: '#38bdf8', yAxis: 'y2', hidden: true },
   { key: 'holdpwm',   label: 'Hold PWM',  color: '#4ade80', yAxis: 'y2', hidden: true },
+  { key: 'eq_pwm',    label: 'Eq PWM',    color: '#f43f5e', yAxis: 'y2', hidden: true },
   { key: 'enter_prog', label: 'Enter %',   color: '#a3e635', yAxis: 'y2', hidden: true },
   { key: 'exit_prog',  label: 'Exit %',    color: '#facc15', yAxis: 'y2', hidden: true },
 ];
@@ -834,6 +851,11 @@ function handleMsg(msg) {
     applyCfg(msg);
     return;
   }
+
+  if (msg.type === 'heatsink_chars') {
+    updateHeatsinkChars(msg);
+    return;
+  }
 }
 
 function updateConnUI(connected, port, baud) {
@@ -888,6 +910,7 @@ function updateTelemetry(d) {
   document.getElementById('tAbsErr').textContent = fmt(d.abs_err);
   document.getElementById('tRun').textContent = d.run_state || '-';
   document.getElementById('tFanInv').textContent = d.fan_inv === '1' ? 'Yes' : 'No';
+  document.getElementById('tEqPWM').textContent = fmt(d.eq_pwm, 1);
 }
 
 function pushHistory(d) {
@@ -907,6 +930,7 @@ function pushHistory(d) {
   history.enter_prog.push(d.enter_prog);
   history.exit_prog.push(d.exit_prog);
   history.fan_pwm.push(d.fan_pwm);
+  history.eq_pwm.push(d.eq_pwm ?? 0);
 
   const trim = Math.max(100, Math.min(200000, maxPts));
   if (history.ts.length > trim * 1.1) {
@@ -968,6 +992,17 @@ async function connect() {
 
 async function disconnect() {
   await api('/api/disconnect', 'POST');
+}
+
+function updateHeatsinkChars(d) {
+  document.getElementById('hRth').textContent  = d.r_th  != null ? d.r_th.toFixed(3)  : '—';
+  document.getElementById('hK').textContent    = d.k     != null ? d.k.toFixed(4)     : '—';
+  document.getElementById('hTmax').textContent = d.t_max != null ? d.t_max.toFixed(1) : '—';
+  document.getElementById('hTau').textContent  = d.tau   != null ? d.tau.toFixed(1)   : '—';
+}
+
+async function setAmbient(val) {
+  await api('/api/ambient', 'POST', { ambient: parseFloat(val) });
 }
 
 async function setVirtSpeed(s) {

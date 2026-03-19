@@ -40,6 +40,8 @@ TELEMETRY_RE = re.compile(
     r"FANPWM:\s*([-+]?\d+)"
     r"(?:\D+MODE:\s*(AUTO|MANUAL|SMART)\D+STATE:\s*(PID|HOLD|MANUAL)\D+MANPWM:\s*([-+]?\d*\.?\d+)\D+HOLDPWM:\s*([-+]?\d*\.?\d+)\D+ENTPROG:\s*([-+]?\d*\.?\d+)\D+EXTPROG:\s*([-+]?\d*\.?\d+)\D+EABS:\s*([-+]?\d*\.?\d+))?"
     r"(?:\D+RUN:\s*(ON|OFF)\D+FANINV:\s*([01]))?"
+    r"(?:\D+V:\s*([-+]?\d*\.?\d+)\s*V\D+I:\s*([-+]?\d*\.?\d+)\s*A\D+W:\s*([-+]?\d*\.?\d+)\s*W)?"
+    r"(?:\D+EQPWM:\s*([-+]?\d*\.?\d+))?"
 )
 
 CFG_RE = re.compile(
@@ -107,6 +109,10 @@ class AppState:
         # Latest telemetry snapshot
         self.last_telemetry: dict[str, Any] = {}
         self.last_cfg: dict[str, Any] = {}
+
+        # Heatsink characterization
+        self.ambient_temp: float = 20.0
+        self._prev_eq_pwm: float = 0.0
 
         # Saved UI state
         self.saved_state: dict[str, str] = self._load_state()
@@ -308,6 +314,10 @@ class AppState:
             abs_err = float(m.group(21) or 0.0)
             run_state = m.group(22) or "ON"
             fan_inv = m.group(23) or "0"
+            ina_voltage = float(m.group(24) or 0.0)
+            ina_current = float(m.group(25) or 0.0)
+            ina_power   = float(m.group(26) or 0.0)
+            eq_pwm = float(m.group(27) or 0.0)
 
             now_iso = dt.datetime.now(dt.timezone.utc).astimezone().isoformat(timespec="milliseconds")
 
@@ -338,9 +348,39 @@ class AppState:
                 "abs_err": abs_err,
                 "run_state": run_state,
                 "fan_inv": fan_inv,
+                "ina_voltage": ina_voltage,
+                "ina_current": ina_current,
+                "power_w": ina_power,
+                "eq_pwm": eq_pwm,
             }
             self.last_telemetry = telemetry
             self.broadcast_sync(telemetry)
+
+            # Heatsink characterization — update when eq_pwm is converging
+            # (converged = eq_pwm changed less than 0.5 PWM units since last call)
+            eq_converged = abs(eq_pwm - self._prev_eq_pwm) < 0.5 and eq_pwm > 1.0
+            self._prev_eq_pwm = eq_pwm
+            if eq_converged:
+                amb = self.ambient_temp
+                delta_t = smooth - amb
+                power_w = ina_power
+                # If INA not connected, estimate from eq_pwm ratio and supply voltage
+                if power_w <= 0.0 and eq_pwm > 0 and ina_voltage > 0 and ina_current > 0 and pwm > 0:
+                    power_w = (eq_pwm / pwm) * ina_power
+                if delta_t > 2.0 and power_w > 0.05:
+                    r_th = delta_t / power_w
+                    k = power_w / delta_t
+                    # Estimate max power at full PWM from current operating point
+                    max_power = (ina_power / max(pwm / 255.0, 0.01)) if pwm > 0 and ina_power > 0 else 15.0
+                    t_max = amb + r_th * max_power
+                    self.broadcast_sync({
+                        "type": "heatsink_chars",
+                        "r_th": round(r_th, 3),
+                        "k": round(k, 4),
+                        "t_max": round(t_max, 1),
+                        "tau": None,
+                        "airspeed": None,
+                    })
 
             # CSV
             if self.csv_logging and self.csv_writer:
@@ -690,6 +730,15 @@ async def set_virtual_speed(payload: dict) -> JSONResponse:
         state._virt.speed = speed
         return JSONResponse({"ok": True, "speed": speed})
     return JSONResponse({"ok": False, "msg": "Not in virtual mode"})
+
+
+@app.post("/api/ambient")
+async def set_ambient(payload: dict) -> JSONResponse:
+    try:
+        state.ambient_temp = float(payload.get("ambient", 20.0))
+    except (ValueError, TypeError) as e:
+        return JSONResponse({"ok": False, "msg": str(e)})
+    return JSONResponse({"ok": True, "ambient": state.ambient_temp})
 
 
 @app.post("/api/virtual/physics")
