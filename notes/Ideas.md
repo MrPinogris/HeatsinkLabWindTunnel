@@ -1,35 +1,58 @@
-## PID GUI Ideas (Student Lab Focus)
+## HeatsinkLab Wind Tunnel — Feature Backlog
 
-## IMPORTANT
+---
 
-####  Wanted data structure in END
+## End Goal (Student Workflow)
 
-```text
-timestamp, run_id, heatsink_id, sp_temp, temp, amb_temp, pwm_heater, fan_cmd, fan_pwm, airspeed, delta_p1, delta_p2, vin, iin, pin, mode, state, event
+The system must deliver this exact experience for every student:
+
+```
+1. Plug ESP32 into lab PC via USB
+2. Open GUI (double-click start.bat)
+3. Follow guided wizard → select port → click Connect → sensors verified automatically
+4. Type heatsink ID (e.g. "HS-03-copper-fin")
+5. Press ONE button: "Start Test"
+6. Wait — temperatures step automatically, soak, record, step again
+7. Results CSV downloads automatically when test finishes
+8. Remove heatsink, insert next one, repeat from step 4
 ```
 
+Students must never need to know what PID is, what a COM port is (beyond selecting from a list), or manually configure temperatures.
 
-## Prioritization Framework
+---
 
-Use this scoring model for each backlog item:
+## Target CSV Schema (Final)
 
-- `Importance` (1..5): impact on heatsink-comparison quality.
-- `Necessity` (1..5): required for a usable student lab workflow.
-- `Dependency` (0 or 1): blocks other high-value work.
-- `Effort` (1..5): engineering cost/complexity.
-- `Score = 2*Importance + 2*Necessity + 2*Dependency - Effort`
+```text
+timestamp, run_id, heatsink_id, sp_temp, temp, amb_temp, pwm_heater, fan_cmd, fan_pwm,
+airspeed, delta_p1, delta_p2, humidity_pct, vin, iin, pin, mode, state, event
+```
 
-Sort by highest `Score` first.
+Fields `airspeed`, `delta_p1`, `delta_p2`, `humidity_pct` are reserved placeholders — they will be populated once the corresponding hardware sensors are connected. Preserve them in the schema even before the sensors exist.
+
+---
+
+## Prioritisation Framework
+
+```
+Score = 2×Importance + 2×Necessity + 2×Dependency − Effort
+
+Importance  (1–5): impact on heatsink-comparison quality
+Necessity   (1–5): required for a usable student lab workflow
+Dependency  (0/1): blocks other high-value work
+Effort      (1–5): engineering cost / complexity
+```
+
+Sort by highest Score first.
+
+---
 
 ## Backlog Template
-
-Copy this block for each candidate feature:
-
 
 ```text
 Title:
 Goal:
-Category: [GUI | Firmware | Data | Safety | Analysis | Reporting]
+Category: [GUI | Backend | Firmware | Data | Safety | Analysis | Reporting | Build]
 
 Importance (1-5):
 Necessity (1-5):
@@ -40,75 +63,20 @@ Score:
 Dependencies:
 Acceptance Criteria:
 - ...
-- ...
 
 Notes:
 ```
 
-## Ideas/Features to Consider
+---
+
+## Backlog (sorted by score, highest first)
+
+---
 
 ```text
-Title: CSV Export costumasation
-Goal: decide what CSV colums are exported
-Category: GUI/Data
-
-Importance (1-5): 5
-Necessity (1-5):5
-Dependency (0/1):
-Effort (1-5): 2
-Score: 11
-
-Dependencies:
-Acceptance Criteria:
-- In GUI when pressing start CSV 1st select what is going in the CSV via chekboxes
-- Generate a function to put in excel to format the data when importing in Excel - at this point the function for all the data looks like this: 
-  = Table.TransformColumnTypes(
-    #"Promoted Headers",
-    {
-        {"timestamp_iso", type datetimezone},
-        {"elapsed_s", type number},
-
-        {"raw_temp_c", type number},
-        {"temp_filtered_c", type number},
-        {"temp_smooth_c", type number},
-
-        {"pwm", Int64.Type},
-
-        {"p_term", type number},
-        {"i_term", type number},
-        {"d_term", type number},
-        {"pid_out", type number},
-        {"pid_bias", type number},
-
-        {"setpoint_bias_c", type number},
-        {"setpoint_c", type number},
-        {"effective_setpoint_c", type number},
-
-        {"fan_speed_pct", type number},
-        {"fan_pwm_raw", Int64.Type},
-
-        {"mode", type text},
-        {"state", type text},
-
-        {"manual_pwm_cmd", type number},
-        {"hold_pwm", type number},
-        {"enter_progress_pct", type number},
-        {"exit_progress_pct", type number},
-
-        {"abs_error_c", type number},
-
-        {"run_state", type text},
-        {"fan_inverted", type number}
-    },
-    "en-US"
-)
-
-notes: this is a must have for the lab, it allows students to easily import the data into Excel and to format it for analysis. It also allows us to only export the data that is relevant for the lab and to avoid overwhelming students with too much data. It could be implemented in a way that allows us to easily add new sensors in the future without having to change the CSV export code.
-```
-```text
-Title: safty
-Goal: Have a separate microcontroller that is dedicated to the safety of the system, and that can monitor the temperature and other sensors and can shut down the system if it detects any unsafe conditions, such as overheating, sensor failure, or other issues that could pose a risk to students or to the equipment.
-Category: Safety
+Title: Safety Layer
+Goal: Configurable max-temperature cutoff with a persistent SAFE / RUNNING / FAULT status indicator visible at all times
+Category: Safety / GUI / Backend
 
 Importance (1-5): 5
 Necessity (1-5): 5
@@ -116,23 +84,190 @@ Dependency (0/1): 1
 Effort (1-5): 4
 Score: 19
 
-Dependencies: the safety microcontroller should be designed to be independent of the main control microcontroller, so that it can continue to monitor the system and to take action even if the main control microcontroller fails or becomes unresponsive. The safety microcontroller should have its own power supply and its own sensors, so that it can operate independently of the main control microcontroller. The safety microcontroller should be programmed with a set of safety rules and thresholds that are based on the expected operating conditions of the lab, and it should be able to take appropriate actions if it detects any unsafe conditions, such as shutting down the heater, shutting down the fan, or sending an alert to the user. The safety microcontroller should also have a way to log any safety events that occur, so that we can analyze them later and improve the safety of the system over time.
+Dependencies: none (software-side status indicator can be done now; hardware watchdog MCU is a separate physical build)
 Acceptance Criteria:
-- the safety microcontroller should be able to monitor the temperature and other sensors in real time, and it should be able to take appropriate actions if it detects any unsafe conditions, such as shutting down the heater, shutting down the fan, or sending an alert to the user
-- the safety microcontroller should be designed to be independent of the main control microcontroller, with its own power supply and its own sensors, so that it can continue to operate even if the main control microcontroller fails or becomes unresponsive
-- the safety microcontroller should be programmed with a set of safety rules and thresholds that are based on the expected operating conditions of the lab, and it should be able to log any safety events that occur for later analysis and improvement of the system's safety
-- have a clear fault code for each type of safety event, so that we can easily identify and troubleshoot any issues that arise
-- have a clear and visible status indicator on the GUI that shows the current safety status of the system (e.g. SAFE, RUNNING, FAULT), so that students and instructors can easily see if the system is operating safely or if there is a fault that needs to be addressed
-- have a way to reset the safety system after a fault has been triggered, so that students can learn from the safety event and can safely resume their experiments after addressing the issue that caused the fault
+- GUI shows a persistent status badge at the top: SAFE (grey), RUNNING (green), FAULT (red)
+- FAULT is triggered by: temperature exceeding configurable limit, thermocouple stuck, INA226 absent, test stalled indefinitely
+- On FAULT: GUI automatically sends SET RUN OFF and blocks further test start until acknowledged
+- Instructor can configure max allowed temperature (default 120 C for lab safety)
+- Each fault shows a fault code with a human-readable explanation (e.g. "FAULT F02: Thermocouple stuck at 25.0 C for 15s")
+- Student can reset FAULT only after manually confirming the issue is resolved (confirm dialog)
 
-
-Notes: this is a must have for the lab, it is essential to ensure the safety of students and to protect the equipment from damage. It could be implemented using a simple microcontroller with a few sensors and relays, and it could be programmed with a set of safety rules that are based on the expected operating conditions of the lab. It should be designed to be robust and reliable, so that it can operate effectively in a student lab environment, and it should also be designed to be easy to maintain and to troubleshoot if any issues arise.
+Notes: The hardware safety watchdog (separate MCU with independent power) is a physical build item outside this software scope.
+This item covers the software-side safety indicator and automatic shutdown logic in server.py and index.html.
 ```
 
+---
+
 ```text
-Title: dual file final build
-Goal: have single executable or an installer so it is a program for the GUI and a program that has to be uploaded to the microcontroller for the firmware, and have a clear separation between the two in terms of code and functionality
-Category: GUI/firmweare/final build
+Title: Post-Test Auto Shutdown
+Goal: Automatically cut heater power when a test finishes — heater must never stay on unattended
+Category: Backend / GUI
+
+Importance (1-5): 5
+Necessity (1-5): 5
+Dependency (0/1): 0
+Effort (1-5): 1
+Score: 17
+
+Dependencies: none
+Acceptance Criteria:
+- When the last temperature step completes its soak and results are recorded: send SET RUN OFF automatically
+- Set fan to a low idle speed (e.g. 20%) for 60s cool-down, then SET FAN 0
+- Log a TEST_COMPLETE event in the raw CSV
+- GUI shows "Test complete — heater off" status message prominently
+- If test is manually stopped mid-run: also send SET RUN OFF immediately
+- Auto-shutdown also triggers if a FAULT is detected during a test
+
+Notes: Safety-critical. The heater must never remain on after a test finishes.
+Currently the firmware stays in RUN ON state indefinitely after a test unless the user manually clicks a button.
+This is a one-line fix in the test completion handler in index.html.
+```
+
+---
+
+```text
+Title: Temperature Range / Batch Entry
+Goal: Let students specify a temperature range (start, stop, step) instead of adding temperatures one-by-one
+Category: GUI
+
+Importance (1-5): 4
+Necessity (1-5): 5
+Dependency (0/1): 0
+Effort (1-5): 2
+Score: 16
+
+Dependencies: none
+Acceptance Criteria:
+- Tester panel has a "Range" row: Start degC, Stop degC, Step degC with a "Generate List" button
+- Clicking Generate populates the temperature list automatically (e.g. 40, 50, 60, 70, 80 C)
+- Also support pasting a comma-separated list directly (e.g. "40, 55, 70, 85")
+- Generated list is editable — students can remove individual entries before starting
+- One-by-one Add button remains available as a fallback
+- Default values shown on first open: Start 40, Stop 80, Step 10 (covers typical lab range)
+
+Notes: Currently students must add every temperature individually by typing and clicking Add.
+For a 7-point test this is 7x type + click. This is the biggest friction point in the current Tester mode.
+```
+
+---
+
+```text
+Title: Guided Connection Wizard
+Goal: Walk students through device connection with step-by-step instructions instead of a bare port dropdown
+Category: GUI / Backend
+
+Importance (1-5): 4
+Necessity (1-5): 4
+Dependency (0/1): 1
+Effort (1-5): 3
+Score: 15
+
+Dependencies: Sensor Health Check (merge as last wizard step)
+Acceptance Criteria:
+- On first open (or when not connected): a wizard panel guides the student:
+    Step 1 — "Plug the USB cable into the ESP32 and into this PC" [Refresh ports] shows detected ports
+    Step 2 — "Select the COM port from the list and click Connect"
+    Step 3 — "Checking device..." with animated spinner during 2.5s handshake (not a silent wait)
+    Step 4 — "Device connected" or "Connection failed: try a different USB cable or port"
+- If handshake fails: show actionable message ("Check USB cable, check Device Manager, try replugging")
+- After connect: show sensor health check before allowing test start (see Sensor Health Check item)
+- Wizard can be dismissed by experienced users who already know what to do
+
+Notes: Currently there is zero guidance. Students see a bare COM port dropdown and a Connect button.
+The 2.5s handshake is completely silent — no indication anything is happening.
+This is the first thing new students encounter and currently causes the most confusion.
+```
+
+---
+
+```text
+Title: Airflow Telemetry Integration
+Goal: Log and display airspeed and differential pressure once hardware sensors are connected
+Category: Backend / GUI / Data
+
+Importance (1-5): 5
+Necessity (1-5): 4
+Dependency (0/1): 1
+Effort (1-5): 3
+Score: 15
+
+Dependencies: Hardware sensor wiring + firmware update to output airspeed/delta_p in telemetry
+Acceptance Criteria:
+- server.py TELEM_RE parses airspeed (m/s) and delta_p1, delta_p2 (Pa) from telemetry
+- Live values shown in GUI sidebar
+- Fields logged to raw CSV (schema_version bumped)
+- Results CSV includes avg airspeed and avg delta_p per test point
+- If sensor is absent (value = 0 or NaN): show "—" in display, do not block test
+
+Notes: Follow the 4-step sensor extension pattern in CLAUDE.md.
+The firmware output format must be updated when sensors are physically wired.
+CSV schema already reserves these column names — do not rename them.
+This item requires firmware changes — confirm with user before starting.
+```
+
+---
+
+```text
+Title: Auto Result Download on Test Completion
+Goal: Automatically save/download both CSVs when a test finishes — no manual button clicks required
+Category: GUI / Backend
+
+Importance (1-5): 4
+Necessity (1-5): 4
+Dependency (0/1): 0
+Effort (1-5): 2
+Score: 14
+
+Dependencies: Post-Test Auto Shutdown (should trigger at the same moment)
+Acceptance Criteria:
+- When test completes: Results CSV is automatically downloaded to the browser Downloads folder
+- Raw CSV is already being written server-side — ensure it is finalized (flush + close) on test end
+- GUI shows "Results saved: heatsink_results_HS-01_2026-03-29.csv" confirmation message
+- Student does not need to click any download button
+- If browser blocks auto-download: show a prominent "Download Results" button as fallback
+- Raw CSV filename includes heatsink ID and timestamp
+
+Notes: Currently students must click two separate download buttons after the test.
+Many will close the browser tab immediately, losing the in-memory Results table.
+```
+
+---
+
+```text
+Title: Startup Sensor Health Check
+Goal: Verify all required sensors are responding correctly right after connection, before allowing a test to start
+Category: GUI / Backend
+
+Importance (1-5): 4
+Necessity (1-5): 4
+Dependency (0/1): 0
+Effort (1-5): 3
+Score: 13
+
+Dependencies: Guided Connection Wizard (health check becomes the final step)
+Acceptance Criteria:
+- After successful handshake: backend reads 3 telemetry frames and checks:
+    Thermocouple: temperature is non-zero, not stuck, and in plausible range (15–45 C at room temp)
+    INA226: voltage reading is non-zero (confirms power monitoring is active)
+- GUI shows a sensor checklist:
+    GREEN  Thermocouple: 23.4 C OK
+    GREEN  Power monitor: 12.1V OK
+    RED    Power monitor: 0V — check INA226 wiring
+- Start Test button is disabled if any required sensor is RED
+- Optional sensors (airspeed, pressure, humidity) show YELLOW "not connected" — test still allowed
+- Student sees clear fix instructions for each failed check
+
+Notes: Without INA226 power readings the R_th calculation produces invalid results (division near zero).
+Currently the system silently produces NaN or infinite R_th if INA226 is not connected.
+```
+
+---
+
+```text
+Title: Dual-File Release Build
+Goal: A single installer for the GUI and a pre-compiled firmware binary for lab technicians with no dev tools
+Category: Build
 
 Importance (1-5): 3
 Necessity (1-5): 5
@@ -140,246 +275,325 @@ Dependency (0/1): 1
 Effort (1-5): 4
 Score: 13
 
-Dependencies: the GUI and the firmware should be developed in parallel but with a clear separation of concerns, so that the GUI can be developed and tested independently of the firmware, and vice versa. The GUI should be designed to work with a defined communication protocol with the firmware, so that we can easily swap out the firmware or the GUI without having to change the other. The final build should include an installer for the GUI that sets up all the necessary dependencies and configurations, and it should also include a way to upload the firmware to the microcontroller, such as through a USB connection or through an SD card. The final build should also include clear instructions for how to install and use the GUI and how to upload the firmware, so that it is easy for students and instructors to get started with the lab.
+Dependencies: all core features must be stable before packaging
 Acceptance Criteria:
-- the final build should include a single executable or an installer for the GUI, and a separate program for the firmware that can be uploaded to the microcontroller
-- the GUI and the firmware should have a clear separation of concerns, with well-defined communication protocols between the two
-- the final build should include clear instructions for how to install and use the GUI and how to upload the firmware, so that it is easy for students and instructors to get started with the lab
-- ...
+- GUI installer: single .exe or .bat that installs Python dependencies and creates a desktop shortcut
+- Firmware binary: pre-built .bin file that can be flashed via esptool (no PlatformIO needed)
+- Clear README for lab technician: "Run installer, plug in ESP32, run flash_firmware.bat"
+- Version number embedded in GUI footer and firmware CFG output so mismatches are detectable
 
-Notes: The firmweare should not be nessary becase the end goal is also to have a fully build setup that can be used by students and instructors without having to worry about the technical details of how to upload the firmware, but it is important to have a clear separation between the GUI and the firmware in terms of code and functionality, so that we can easily develop and test them independently, and so that we can easily swap out one or the other if needed. The final build should be designed with ease of use in mind, so that it is accessible to students with no prior experience with programming or electronics, and it should also be designed to be robust and reliable, so that it can withstand the rigors of a student lab environment. the firmweaer is also given for in the instance if we want to have a setup where the students can upload their own firmware to the microcontroller to test different control algorithms or different sensor configurations, but it is not essential for the core functionality of the lab, and it could be added as an optional feature after we have a stable and usable version of the GUI with the core features. or the firmweare becomes corruptes or other issues arise with the microcontroller, having the firmware available allows us to quickly re-upload it and get the lab back up and running without having to wait for a new microcontroller or a new pre-flashed firmware to arrive.
+Notes: End goal is that a lab technician with no programming knowledge can set up the entire system.
+Firmware binary also allows re-flashing a corrupted or replaced ESP32 without a dev environment.
 ```
 
+---
+
 ```text
-Title: graph cursor 
-Goal: have the abilithy to add a cursor in the graph in GUI
+Title: Heatsink ID Input
+Goal: Let students label each test with a heatsink identifier so result files are self-documenting
+Category: GUI / Data
+
+Importance (1-5): 3
+Necessity (1-5): 4
+Dependency (0/1): 0
+Effort (1-5): 2
+Score: 12
+
+Dependencies: none
+Acceptance Criteria:
+- Tester panel has a "Heatsink ID" text field above the Start button (e.g. "HS-01-copper-fin")
+- ID is included in:
+    Results CSV filename: heatsink_results_HS-01_2026-03-29T143022.csv
+    Results CSV header row
+    Raw CSV filename: serial_HS-01_2026-03-29T143022.csv
+- If field is empty: warn student before allowing test start ("Please enter a heatsink ID")
+- ID is remembered until manually cleared (so student doesn't retype for re-runs of the same heatsink)
+
+Notes: Currently all result files have generic timestamped names.
+Students have no way to tell which file belongs to which heatsink without opening them.
+```
+
+---
+
+```text
+Title: Experiment Presets
+Goal: Save and load full test configurations (temperature list, fan speed, soak time) with a name
 Category: GUI
 
 Importance (1-5): 3
 Necessity (1-5): 3
-Dependency (0/1):
-Effort (1-5): 1
-Score: 7
-
-Dependencies:
-Acceptance Criteria:
-- can be toggeled on or off
-- tells the values of all the turned on graphs in its on menu
--is easaly moovable (sliding on graph not a slider outside of graph)
-
-notes: this is a nice to have but not a must have, it would make it easier for students to read values at specific times and to compare values at different times, but it is not essential for the core functionality of the lab. It could be added after we have a stable and usable version of the GUI with the core features.
-
-```
-
-```text
-Title: Presets
-Goal: have Presets in GUI for diffrent setups/PID setups and diffrent heatsincs and be able to save a setup to a costum named new preset
-Category: GUI
-
-Importance (1-5): 2
-Necessity (1-5): 4
-Dependency (0/1):
+Dependency (0/1): 0
 Effort (1-5): 2
 Score: 8
 
-Dependencies:
+Dependencies: Temperature Range Entry recommended first
 Acceptance Criteria:
-- be able to save the current setup as a preset with a costum name
-- be able to load a preset and have all the settings in the GUI change to the preset
-- be able to delete a preset
-- be able to edit a preset (load it, change it, save it with the same name or a new name)
-- have some default presets for the different heatsinks and for diffrent PID setups (e.g. one with a lot of D, one with no D, one with a lot of P, etc.)
+- "Save Preset" button stores current test config (temps, fan %, soak time) under a user-chosen name
+- "Load Preset" dropdown fills all fields instantly
+- Presets persisted in browser localStorage (no server-side storage needed)
+- Default presets shipped: "Lab Standard 40-80 step 10", "Quick 3-point", "Natural Convection"
+- Can delete a custom preset
 
-Notes: this is a nice to have but not a must have, it would make it easier for students to get started and to compare different setups, but it is not essential for the core functionality of the lab. It could be added after we have a stable and usable version of the GUI with the core features.
-```
-```text
-Title: user manual for GUI
-Goal: have a user manual for the GUI that explains how to use it and what each feature does
-Category: GUI
-
-Importance (1-5): 2
-Necessity (1-5): 4
-Dependency (0/1): 0
-Effort (1-5): 1
-Score: 8
-
-Dependencies: /
-Acceptance Criteria:
-- the manual should be easy to understand and follow for students with no prior experience with PID control or data analysis
-- the manual should include screenshots of the GUI and examples of how to use each feature
-- the manual should be available in a digital format (e.g. PDF) that can be easily accessed and shared with students
-- the manual should be updated as new features are added to the GUI
-- the manual should include a troubleshooting section for common issues that students may encounter when using the GUI
-- the manual should include a section on how to interpret the data and metrics generated by the GUI, including how to use the cursor tool and how to analyze the graphs.
-- the manual should explain how to setup Excel to import the CSV data and how to use the provided Excel function to format the data for analysis. And visualize the data in a scatter graph with the relevant metrics (e.g. rise time, settling time, overshoot, etc.)
-- ...
-
-Notes: this is a must have for the lab, it will help students to understand how to use the GUI and to get the most out of it, it will also help to reduce the number of questions and issues that students may have when using the GUI, and it will make it easier for instructors to teach the lab and to troubleshoot any issues that may arise. It should be developed in parallel with the GUI development, so that it can be updated as new features are added.
+Notes: Useful for instructors who want to standardise the test procedure across student groups.
+Reduces setup time when running the same test repeatedly on different heatsinks.
 ```
 
+---
+
 ```text
-Title: tooltips GUI
-Goal: have tooltips in the GUI that explain what each feature does when the user hovers over it
+Title: Tooltips
+Goal: Show brief plain-language explanations when hovering over controls and metric readouts
 Category: GUI
 
 Importance (1-5): 3
-Necessity (1-5): 4
+Necessity (1-5): 3
 Dependency (0/1): 0
 Effort (1-5): 1
 Score: 8
 
-Dependencies: 
+Dependencies: none
 Acceptance Criteria:
-- when the user hovers over a feature in the GUI, a tooltip should appear that explains what the feature does and how to use it
-- the tooltip should be easy to understand and should provide enough information for students to use the feature without having to refer to the user manual
-- the tooltip should be available for all features in the GUI, including buttons, sliders, and graphs
-- the tooltip should be updated as new features are added to the GUI
+- All buttons, sliders, and metric readouts have a tooltip on hover
+- Written in plain language — no engineering jargon
+- Examples:
+    Setpoint: "Target temperature in °C that the heater will try to reach"
+    R_th: "Thermal resistance — how well this heatsink transfers heat. Lower is better."
+    EqPWM: "Heater power at steady state (0–255). Lower means less power needed = better heatsink."
+    Fan %: "Cooling fan speed. 0 = no forced airflow. 100 = maximum airflow."
+- Tooltips updated as new features are added
 
-Notes: this is a nice to have but not a must have, it would make it easier for students to understand how to use the GUI and to get the most out of it, but it is not essential for the core functionality of the lab. It could be added after we have a stable and usable version of the GUI with the core features, and it could be developed in parallel with the user manual, so that it can be updated as new features are added.
+Notes: Students have no PID background. Every unexplained number causes confusion and instructor questions.
 ```
 
+---
+
 ```text
-Title: Expert/learning mode
-Goal: have an expert mode and a learning mode in the GUI, where the learning mode has more guidance and explanations for students, and the expert mode has more advanced features for instructors or advanced students
+Title: In-App User Manual
+Goal: Built-in help panel explaining all features and how to interpret results, available offline
 Category: GUI
 
 Importance (1-5): 2
-Necessity (1-5): 3
+Necessity (1-5): 4
 Dependency (0/1): 0
-Effort (1-5): 3
+Effort (1-5): 2
 Score: 8
 
-Dependencies:
+Dependencies: tooltips recommended first
 Acceptance Criteria:
-- the GUI should have a toggle to switch between expert mode and learning mode
-- in learning mode, the GUI should provide more guidance and explanations for students, such as tooltips, a user manual, and a simplified interface that focuses on the core features of the lab
-- in expert mode all the parameters and features should be available for instructors or advanced students who want to explore more advanced concepts or who want to customize the lab setup
-- the GUI should remember the last mode used and should default to that mode when it is opened
-- the GUI should allow instructors to lock certain features or parameters in learning mode to prevent students from changing them and to ensure that they are following the intended lab procedure
-- the GUI should allow instructors to customize the learning mode interface to focus on specific features or concepts that they want to emphasize in their lab sessions
-- the GUI should provide a way for instructors to access and manage the different modes, such as a settings panel or a dedicated mode switcher
+- A help button opens a panel or modal with the full user manual embedded in the page
+- Sections: Getting Started, Running a Test, Understanding Results, Troubleshooting
+- Explains R_th, k, EqPWM in plain language with typical example values
+- Explains how to import the CSV into Excel using the Power Query formula (see CSV Export Customisation item)
+- Available offline (embedded in index.html, not an external link)
+- Current MANUAL.md content migrated here and kept in sync
 
-Notes: this is a nice to have but not a must have, it would make it easier for students to understand how to use the GUI and to get the most out of it, and it would also allow instructors to customize the lab experience for their students, but it is not essential for the core functionality of the lab. It could be added after we have a stable and usable version of the GUI with the core features, and it could be developed in parallel with the user manual and tooltips, so that it can be updated as new features are added.
+Notes: MANUAL.md currently exists as a standalone file that students are unlikely to find.
+Embedding it in the GUI ensures it is always one click away.
 ```
+
+---
+
 ```text
-Title: PID learning mode or Heat Transfer learning mode
-Goal: have a PID learning mode or a Heat Transfer learning mode in the GUI, where students can learn about the concepts of PID control or heat transfer where all the PID settings are fully setup and automatically adjusted to show the effects of changing one parameter at a time, and where the GUI provides explanations and guidance for students to understand the concepts and to see the effects of their changes in real time
+Title: Graph Cursor / Probe Tool
+Goal: Allow students to read exact values at any point in time on the live graph
 Category: GUI
 
-Importance (1-5): 1
+Importance (1-5): 3
 Necessity (1-5): 2
 Dependency (0/1): 0
-Effort (1-5): 4
-Score: 8
+Effort (1-5): 1
+Score: 7
 
-Dependencies:
+Dependencies: none
 Acceptance Criteria:
-- the GUI should have a toggle to switch to PID learning mode or Heat Transfer learning mode
-- in PID learning mode the GUI is layed out to maximize the understanding of the effects of changing each PID parameter, for example by showing the P, I, D, and output decomposition with hints on how to adjust the parameters to achieve desired effects (e.g. high overshoot: lower Kp or raise D, steady-state offset: increase Ki or bias)
-- in Heat Transfer learning mode the GUI is layed out to maximize the understanding of the heat transfer concepts, for example by showing the temperature distribution across the heatsink, the heat flux, and the effects of changing the airflow or the ambient temperature on the heat transfer performance
-- in both modes the GUI should provide explanations and guidance for students to understand the concepts and to see the effects of their changes in real time, such as tooltips, a user manual, and interactive elements that allow students to experiment with the parameters and to see the results in the graphs and metrics
-- the GUI should allow students to switch between the learning modes and the regular mode, so that they can apply what they have learned in the learning modes to the regular lab experiments
-- the GUI should provide a way for instructors to customize the learning modes, such as by allowing them to choose which parameters to focus on, or by providing additional explanations or examples for specific concepts that they want to emphasize in their lab sessions
+- Cursor mode toggled on/off with a button
+- Cursor slides along the time axis as mouse moves over the graph
+- Tooltip shows all active series values at the cursor position
+- Delta mode: click two points to see delta-T, delta-PWM, delta-time between them
+- Does not interfere with normal chart pan/zoom
 
-
-Notes: this is a nice to have but not a must have, it would provide an interactive and engaging way for students to learn about PID control and heat transfer concepts, and it would allow them to see the effects of their changes in real time, but it is not essential for the core functionality of the lab. It could be added after we have a stable and usable version of the GUI with the core features, and it could be developed in parallel with the user manual and tooltips, so that it can be updated as new features are added.
+Notes: Useful for students reading values at specific moments (e.g. exactly when HOLD state was entered).
+Low effort — Chart.js has crosshair plugin support built in.
 ```
 
-## Suggested Priorities (Given Current Project Goal)
+---
 
-### P0 (Now)
+```text
+Title: CSV Export Customisation
+Goal: Let users choose which columns to include in the exported CSV before downloading
+Category: GUI / Data
 
-1. Structured experiment workflow
-- Add phase markers/events in graph + CSV.
-- Add core auto-metrics (rise time, settling, overshoot, steady-state error).
+Importance (1-5): 3
+Necessity (1-5): 2
+Dependency (0/1): 0
+Effort (1-5): 2
+Score: 6
 
-2. Stable/upgrade-proof data model
-- Introduce schema versioning (`schema_version`) and run metadata (`run_id`, `heatsink_id`).
-- Keep placeholders for upcoming sensors.
+Dependencies: none
+Acceptance Criteria:
+- When triggering CSV download: show a column-selection panel with checkboxes
+- Checkboxes grouped by category: Temperature, PID Terms, Fan, Power, Metadata, Future Sensors
+- Default selection: columns most relevant for student lab analysis (exclude raw PID internals)
+- "Select all" and "Reset to default" buttons
+- Companion .txt file with the matching Power Query formula is included in the download
 
-3. Safety + reproducibility baseline
-- Ensure `RUN ON/OFF`, sensor-fault behavior, and configuration capture per run.
+Power Query formula (all current + future columns):
+= Table.TransformColumnTypes(
+    #"Promoted Headers",
+    {
+        {"timestamp_iso", type datetimezone},
+        {"elapsed_s", type number},
+        {"raw_temp_c", type number},
+        {"temp_filtered_c", type number},
+        {"temp_smooth_c", type number},
+        {"pwm", Int64.Type},
+        {"p_term", type number},
+        {"i_term", type number},
+        {"d_term", type number},
+        {"pid_out", type number},
+        {"pid_bias", type number},
+        {"setpoint_bias_c", type number},
+        {"setpoint_c", type number},
+        {"effective_setpoint_c", type number},
+        {"fan_speed_pct", type number},
+        {"fan_pwm_raw", Int64.Type},
+        {"mode", type text},
+        {"state", type text},
+        {"manual_pwm_cmd", type number},
+        {"hold_pwm", type number},
+        {"enter_progress_pct", type number},
+        {"exit_progress_pct", type number},
+        {"abs_error_c", type number},
+        {"run_state", type text},
+        {"fan_inverted", type number},
+        {"vin", type number},
+        {"iin", type number},
+        {"pin", type number},
+        {"airspeed", type number},
+        {"delta_p1", type number},
+        {"delta_p2", type number},
+        {"humidity_pct", type number}
+    },
+    "en-US"
+)
 
-### P1 (Power Sensor Arrival)
+Notes: Lower priority than the core workflow features.
+Students at this stage don't need column selection — the full CSV is acceptable.
+The Power Query formula above must be updated each time a new sensor column is added (bump schema_version too).
+```
 
-1. Add power telemetry
-- Log `voltage`, `current`, `power_in`.
+---
 
-2. Equilibrium/dissipation analysis
-- Detect steady state and estimate dissipation from power balance.
+```text
+Title: Closed-Loop Fan Airspeed Control
+Goal: Control fan speed by feedback to maintain a target airspeed rather than a fixed PWM percentage
+Category: Backend / Firmware
 
-3. Comparison KPIs
-- Per-run summary for heatsink ranking under same conditions.
+Importance (1-5): 4
+Necessity (1-5): 3
+Dependency (0/1): 0
+Effort (1-5): 4
+Score: 6
 
-### P2 (Pressure + Airspeed Sensor Arrival)
+Dependencies: Airspeed sensor hardware + Airflow Telemetry Integration
+Acceptance Criteria:
+- GUI has a "Target airspeed (m/s)" input in the Tester panel alongside fan %
+- Backend runs a simple feedback loop: adjust fan PWM until measured airspeed matches target
+- Enables fair heatsink comparison: identical airspeed for all heatsinks tested
+- Manual fan % control remains as fallback
+- Results CSV records actual measured airspeed per test step, not just commanded fan %
 
-1. Airflow telemetry
-- Log `airspeed` and `delta_p`.
+Notes: Requires both software changes AND the airspeed sensor to be physically connected.
+Deprioritised until airspeed hardware arrives.
+```
 
-2. Closed-loop airspeed control
-- Add a fan control loop to maintain target airspeed.
+---
 
-3. Condition lock for fair comparison
-- Test at fixed setpoint + fixed airspeed + recorded pressure drop.
+```text
+Title: Humidity and Ambient Conditions Logging
+Goal: Log ambient humidity per test point for improved experiment repeatability
+Category: Backend / Data
 
-1. Experiment Presets
-- Save/load full test setups (SP, mode, gains, fan, thresholds, y-scale).
-- One-click presets like `Step Response`, `Disturbance Test`, `Manual Bias Find`.
+Importance (1-5): 3
+Necessity (1-5): 2
+Dependency (0/1): 0
+Effort (1-5): 2
+Score: 6
 
-2. Guided Lab Mode
-- Wizard flow: `Connect -> Preheat -> Run -> Disturb -> Analyze -> Save`.
-- Lock irrelevant controls per step to reduce mistakes.
+Dependencies: Humidity sensor hardware (e.g. SHT31 on I2C) + firmware update
+Acceptance Criteria:
+- Follow the 4-step sensor extension pattern in CLAUDE.md
+- server.py parses humidity_pct from telemetry, broadcasts in telemetry message
+- Field added to CSV_FIELDS (schema_version bumped)
+- Shown in GUI sidebar
+- Results CSV includes avg humidity per test point
+- If sensor absent: field shows dash, test not blocked
 
-3. Auto Test Scripts
-- Scripted sequences:
-  - Setpoint steps (`30 -> 60 -> 80 C`)
-  - Fan disturbance pulse
-  - Hold test (steady-state)
-- Write phase markers to CSV.
+Notes: Humidity affects air density and thus heat transfer.
+Logging it enables students to compare results across different days and conditions.
+Deprioritised until sensor hardware arrives.
+```
 
-4. Performance Metrics Auto-Compute
-- Show `rise time`, `settling time`, `overshoot`, `steady-state error`, `IAE/ISE`.
-- Compute metrics per phase and export.
+---
 
-5. Cursor/Probe Tool
-- Click graph to read exact values at time `t`.
-- Delta mode between two points: `ΔT`, `ΔPWM`, `Δt`, slope.
+```text
+Title: Expert / Instructor Mode
+Goal: Toggle between a simplified student view and a full-featured expert view
+Category: GUI
 
-6. Annotation Markers
-- Buttons to add markers (`Fan ON`, `Heatsink Changed`, `Mode Switch`) to CSV/log.
-- Draw vertical marker lines with labels on graph.
+Importance (1-5): 2
+Necessity (1-5): 2
+Dependency (0/1): 0
+Effort (1-5): 3
+Score: 5
 
-7. Safety Layer
-- Configurable max-temp cutoff, max-PWM duration, sensor-fault lockout.
-- Big status indicator: `SAFE / RUNNING / FAULT`.
+Dependencies: none
+Acceptance Criteria:
+- Toggle between Student mode (test controls only) and Expert mode (all PID tuning, manual PWM, raw telemetry)
+- GUI remembers last mode in localStorage
+- In Student mode: PID sliders, manual PWM, bias inputs hidden
+- In Expert mode: everything visible, same as current GUI
+- Instructors can optionally lock mode so students cannot switch to Expert
 
-8. Heatsink Comparison View
-- Overlay multiple runs from CSV.
-- Normalize time to event (e.g., step start).
-- Compare key metrics side by side.
+Notes: The current GUI shows PID tuning sliders to students who don't need them.
+This causes accidental parameter changes and confusion.
+Lower priority — implement after guided wizard, batch entry, and auto-download are complete.
+```
 
-9. Student Report Export
-- Generate PDF/HTML report with:
-  - Graphs
-  - Config used
-  - Metrics
-  - Student notes
-  - Pass/fail checks
+---
 
-10. PID Learning Overlay
-- Show `P`, `I`, `D`, and output decomposition with hints:
-  - High overshoot: lower `Kp` or raise `D`
-  - Steady-state offset: increase `Ki` or bias
+```text
+Title: PID Learning Overlay
+Goal: Visualise P, I, D term contributions separately with hints for understanding PID behaviour
+Category: GUI
 
-11. Access Levels
-- `Student mode`: limited controls.
-- `Instructor mode`: full tuning, thresholds, scripting.
+Importance (1-5): 2
+Necessity (1-5): 1
+Dependency (0/1): 0
+Effort (1-5): 3
+Score: 3
 
-12. Scoring/Checklist
-- Define rubric targets (e.g., overshoot < 5%, settling < 120s).
-- Auto-score each run for objective grading.
+Dependencies: Expert / Instructor Mode recommended first
+Acceptance Criteria:
+- Toggleable overlay showing P, I, D contributions as separate chart series
+- Hints shown for extreme values: "High overshoot: lower Kp or increase Kd"
+- Only visible in Expert mode
 
-## Suggested Next Two
+Notes: Educational feature for advanced PID labs.
+The primary use case of this project (heatsink comparison) does not involve PID tuning by students.
+Very low priority — implement only after all core workflow features are done.
+```
 
-1. Add phase markers + annotations in CSV/graph.
-2. Add automatic rise/settling/overshoot metrics panel.
+---
+
+## Current P0 Priorities (Implement Next)
+
+All five are software-only changes to `server.py` and `index.html`. No firmware required.
+
+| Priority | Item | Score | Why |
+|----------|------|-------|-----|
+| 1 | Post-Test Auto Shutdown | 17 | Safety: heater must not stay on after test |
+| 2 | Temperature Range / Batch Entry | 16 | Biggest friction point in current Tester |
+| 3 | Guided Connection Wizard | 15 | Biggest confusion point for new students |
+| 4 | Startup Sensor Health Check | 13 | Prevents silent invalid R_th results |
+| 5 | Heatsink ID Input | 12 | Makes result files self-documenting |
