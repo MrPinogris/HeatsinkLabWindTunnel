@@ -2,9 +2,12 @@
 
 ---
 
-## End Goal (Student Workflow)
+## ⚑ END GOAL — Definition of "Project Complete"
 
-The system must deliver this exact experience for every student:
+> **If an agent is asked to "finish the project", this section defines what finished means.**
+> Implement every P0 item and any other backlog item needed until the workflow below works end-to-end without exception.
+
+The project is **not done** until every student can complete the following workflow without assistance, without engineering knowledge, and without any manual steps beyond what is listed:
 
 ```
 1. Plug ESP32 into lab PC via USB
@@ -17,7 +20,23 @@ The system must deliver this exact experience for every student:
 8. Remove heatsink, insert next one, repeat from step 4
 ```
 
-Students must never need to know what PID is, what a COM port is (beyond selecting from a list), or manually configure temperatures.
+**The student must NEVER need to:**
+- Know what PID is or touch any PID setting
+- Know what a COM port is beyond selecting one from a list
+- Manually add temperatures one by one
+- Click a Download button after the test
+- Do anything after pressing Start Test except wait and swap heatsinks
+
+**The project IS done when:**
+- The guided connection wizard exists and works (step 3)
+- The heatsink ID field exists and is required (step 4)
+- Temperature range/batch entry exists so the test list is set up in seconds (step 5)
+- The test runs fully automatically — no clicks mid-test (step 6)
+- Results CSV downloads automatically on completion (step 7)
+- The heater shuts off automatically after every test (safety, step 7)
+- Sensor health is verified before allowing a test to start (reliability)
+
+All of the above are software-only changes to `server.py` and `index.html`. No firmware required.
 
 ---
 
@@ -588,12 +607,15 @@ Very low priority — implement only after all core workflow features are done.
 
 ## Current P0 Priorities (Implement Next)
 
-All five are software-only changes to `server.py` and `index.html`. No firmware required.
+> These are the items that stand between the current state and the End Goal above.
+> Implement them in order. When all five are done, the 8-step student workflow is complete.
+> All are software-only changes to `server.py` and `index.html`. No firmware required.
 
-| Priority | Item | Score | Why |
-|----------|------|-------|-----|
-| 1 | Post-Test Auto Shutdown | 17 | Safety: heater must not stay on after test |
-| 2 | Temperature Range / Batch Entry | 16 | Biggest friction point in current Tester |
-| 3 | Guided Connection Wizard | 15 | Biggest confusion point for new students |
-| 4 | Startup Sensor Health Check | 13 | Prevents silent invalid R_th results |
-| 5 | Heatsink ID Input | 12 | Makes result files self-documenting |
+| Priority | Item | Score | End Goal Step | Why |
+|----------|------|-------|---------------|-----|
+| 1 | Post-Test Auto Shutdown | 17 | Step 7 (safety) | Heater must not stay on after test — safety-critical |
+| 2 | Temperature Range / Batch Entry | 16 | Step 5 | Biggest friction point — students can't add 7 temps one-by-one |
+| 3 | Guided Connection Wizard | 15 | Step 3 | Biggest confusion point — students don't know what a COM port is |
+| 4 | Startup Sensor Health Check | 13 | Step 3 (final) | Prevents silent invalid R_th results if INA226 is not connected |
+| 5 | Heatsink ID Input | 12 | Step 4 | Makes result files self-documenting; required before Start Test |
+| 6 | Auto Result Download | 14 | Step 7 | Students must not need to click Download — results must save automatically |
