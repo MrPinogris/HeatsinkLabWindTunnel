@@ -40,7 +40,7 @@ Students must never need to:
 
 **All new features must be implemented in `server.py` and/or `index.html` (the backend and frontend).**
 
-Firmware (`src/main.cpp`, `src/PIDController.cpp`) is considered **stable and locked**. Treat it as a black box that exposes:
+Firmware (`src/` folder) is considered **stable and locked**. Treat it as a black box that exposes:
 - A serial command interface (`SET`, `GET`)
 - A telemetry stream (parsed by `server.py`)
 
@@ -56,12 +56,12 @@ Firmware (`src/main.cpp`, `src/PIDController.cpp`) is considered **stable and lo
 
 ```
 ┌──────────────────────────────────┐
-│  Firmware (C++ / ESP32-S3)       │  src/main.cpp, src/PIDController.cpp
-│  - PID heater + fan control      │  ← STABLE / LOCKED — treat as black box
-│  - MAX6675 thermocouple (SPI)    │
-│  - INA226 power monitor (I2C)    │
-│  - Serial command interface      │
-│  - NVS config persistence        │
+│  Firmware (C++ / ESP32-S3)       │  src/  ← STABLE / LOCKED — treat as black box
+│  - PID heater + fan control      │  main.cpp · PIDController.cpp/h
+│  - MAX6675 thermocouple (SPI)    │  SensorManager.cpp/h
+│  - INA226 power monitor (I2C)    │  SerialProtocol.cpp/h
+│  - Serial command interface      │  ExtSensorRegistry.cpp/h
+│  - NVS config persistence        │  SystemState.h
 └────────────┬─────────────────────┘
              │ USB Serial (115200 baud)
 ┌────────────▼─────────────────────┐
@@ -87,8 +87,12 @@ Firmware (`src/main.cpp`, `src/PIDController.cpp`) is considered **stable and lo
 
 | File | Role |
 |------|------|
-| `src/main.cpp` | Firmware: PID loop, state machine, serial protocol — DO NOT TOUCH without confirmation |
+| `src/main.cpp` | Firmware: setup, loop, control FSM (SMART/AUTO/MANUAL), actuators — DO NOT TOUCH without confirmation |
 | `src/PIDController.cpp/h` | PID controller class — DO NOT TOUCH without confirmation |
+| `src/SensorManager.cpp/h` | MAX6675 + INA226 reads, EMA filter, glitch reject, stuck watchdog — DO NOT TOUCH without confirmation |
+| `src/SerialProtocol.cpp/h` | Serial command handler, printConfig, emitTelemetry, NVS load/save — DO NOT TOUCH without confirmation |
+| `src/ExtSensorRegistry.cpp/h` | Fixed-size slot registry for future extension sensors (airspeed, pressure, humidity) — add sensor slots here |
+| `src/SystemState.h` | POD struct holding all shared config and runtime state; ControlMode enum |
 | `tools/web_gui/server.py` | FastAPI backend, WebSocket, CSV logging — **primary development target** |
 | `tools/web_gui/static/index.html` | Single-page frontend (all JS/CSS inline) — **primary development target** |
 | `tools/web_gui/requirements.txt` | Python dependencies |
@@ -178,10 +182,13 @@ The CSV target schema already has placeholders for `airspeed`, `delta_p1`, `delt
 
 **4-step pattern to add any new sensor:**
 
-**Step 1 — Firmware (`src/main.cpp`)**
-- Read the new sensor in the main loop
-- Append its value to the telemetry `Serial.printf(...)` output line
-- Add a `SET` command if the sensor needs configuration (e.g. calibration offset)
+**Step 1 — Firmware (`src/`)**
+- Add a field to `CoreSensorData` in `SensorManager.h` (follow the inline comment guide there)
+- Populate the field in `SensorManager::read()` in `SensorManager.cpp`
+- In `main.cpp` `setup()`: call `extSensors.registerSensor("KEY", "unit")` and store the returned slot index
+- In `main.cpp` `loop()`: call `extSensors.update(slotIndex, value)` each tick
+- The new field will appear automatically in telemetry via `ExtSensorRegistry::emitAll()` — no format-string edits needed
+- Add a `SET` command in `SerialProtocol.cpp` if the sensor needs runtime configuration (e.g. calibration offset)
 - _This step requires physical access to flash the ESP32_
 
 **Step 2 — Backend (`tools/web_gui/server.py`)**
@@ -207,7 +214,7 @@ The CSV target schema already has placeholders for `airspeed`, `delta_p1`, `delt
 These rules apply whenever Claude works autonomously on this project.
 
 ### NEVER do without explicit user confirmation:
-1. **Touch firmware** — Never edit `src/main.cpp` or `src/PIDController.cpp`. Never run `pio run -t upload`.
+1. **Touch firmware** — Never edit files under `src/` (main.cpp, PIDController.cpp/h, SensorManager.cpp/h, SerialProtocol.cpp/h, SystemState.h). Never run `pio run -t upload`. Exception: `src/ExtSensorRegistry.cpp/h` may be edited to register new sensors when hardware arrives.
 2. **Increase temperature limits** — The firmware accepts setpoints up to 400°C. Do not raise this ceiling.
 3. **Remove or weaken safety checks** — Glitch rejection, stuck-sensor detection, anti-windup limits are safety features.
 4. **Modify PWM slew-rate limiting** — `maxPwmStep` prevents abrupt heater jumps.
