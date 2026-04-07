@@ -38,8 +38,8 @@
     - [ ] **implementation** implement the PCB design and test it with the hardware components to make sure that everything is working properly and there are no issues with the connections or power supply
 ### Software
 #### ESP32 ./src/
-- [ ] **Refactoring** put the part of the code that handels the Serial communication in a separate file and make it a function that can be called in the main loop and more readable
-- [ ] **Refactoring** put the part of the code that handels the sensors in a separate file and make it a function that can be called in the main loop and more readable
-- [ ] **Refactoring** make the code more modular and easier to read by using functions and classes
+- [x] **Refactoring** put the part of the code that handels the Serial communication in a separate file and make it a function that can be called in the main loop and more readable
+- [x] **Refactoring** put the part of the code that handels the sensors in a separate file and make it a function that can be called in the main loop and more readable
+- [x] **Refactoring** make the code more modular and easier to read by using functions and classes
 #### Server ./tools/web_gui/
 - [ ] **feature** 
