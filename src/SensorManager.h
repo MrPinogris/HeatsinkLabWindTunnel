@@ -52,6 +52,11 @@ struct CoreSensorData {
     float inaPower;      // computed power, W  (= inaVoltage × inaCurrent)
     bool  inaOk;         // false if INA226 not found on I2C at boot
 
+    // ── EZO-HUM humidity probe (I2C 0x6F) ─────────────────────────────────
+    float humidityPct;   // relative humidity, %RH  (0 if sensor absent)
+    float humTemp;       // ambient temperature from probe, °C
+    bool  ezoHumOk;      // false if no valid response received yet
+
     // ── Status flags ───────────────────────────────────────────────────────
     bool  tempStuck;     // true this tick if stuck-watchdog fired (heater cut)
 };
@@ -85,6 +90,13 @@ private:
     float    _lastTempForStuck= NAN;
     uint16_t _sameCount       = 0;
     bool     _inaOk           = false;
+
+    // EZO-HUM state
+    bool     _ezoReadPending  = false;
+    uint32_t _ezoSendTime     = 0;
+    float    _humidityPct     = 0.0f;
+    float    _humTemp         = 0.0f;
+    bool     _ezoHumOk        = false;
 
     bool  isValidTemp(float t) const;
     float applyGlitchReject(float t);

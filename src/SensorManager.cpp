@@ -11,6 +11,10 @@ static const int PIN_SO  = 11;
 static const int PIN_SDA = 15;
 static const int PIN_SCL = 16;
 
+// ── EZO-HUM constants ─────────────────────────────────────────────────────────
+static const uint8_t  EZO_HUM_ADDR          = 0x6F;
+static const uint32_t EZO_RESPONSE_DELAY_MS = 300;
+
 // ── Sensor constants ──────────────────────────────────────────────────────────
 static const float SUPPLY_VOLTAGE   = 12.0f;  // nominal PSU voltage used for power calc
 static const float MAX_JUMP_C       = 100.0f; // glitch reject: max allowed single-tick jump
@@ -30,6 +34,17 @@ void SensorManager::begin(float emaAlphaInit) {
     _emaAlpha = emaAlphaInit;
 
     Wire.begin(PIN_SDA, PIN_SCL);
+
+    // EZO-HUM: enable temperature output, disable dew point (sent once at boot)
+    Wire.beginTransmission(EZO_HUM_ADDR);
+    Wire.write("O,T,1\r");
+    Wire.endTransmission();
+    delay(300);
+    Wire.beginTransmission(EZO_HUM_ADDR);
+    Wire.write("O,Dew,0\r");
+    Wire.endTransmission();
+    delay(300);
+
     _inaOk = ina226.begin();
     if (_inaOk) {
         ina226.setMaxCurrentShunt(2.0f, 0.0353f);  // 2 A max, ~35.3 mΩ shunt
@@ -84,6 +99,40 @@ CoreSensorData SensorManager::read() {
         d.smoothTemp = NAN;
         d.tempStuck  = false;
     }
+
+    // ── EZO-HUM: read previous response if ≥300 ms have elapsed ──────────
+    if (_ezoReadPending && (millis() - _ezoSendTime >= EZO_RESPONSE_DELAY_MS)) {
+        Wire.requestFrom(EZO_HUM_ADDR, (uint8_t)20);
+        uint8_t status = Wire.available() ? Wire.read() : 0xFF;
+        char buf[24] = {};
+        uint8_t idx = 0;
+        if (status == 0x01) {
+            while (Wire.available() && idx < sizeof(buf) - 1) {
+                char c = Wire.read();
+                if (c == 0 || c == '\r') break;
+                buf[idx++] = c;
+            }
+        }
+        _ezoReadPending = false;
+        char *comma = strchr(buf, ',');
+        if (comma) {
+            *comma = '\0';
+            _humidityPct = atof(buf);
+            _humTemp     = atof(comma + 1);
+            _ezoHumOk    = true;
+        }
+    }
+
+    // ── EZO-HUM: send new read command for next tick ──────────────────────
+    Wire.beginTransmission(EZO_HUM_ADDR);
+    Wire.write('R');
+    Wire.endTransmission();
+    _ezoReadPending = true;
+    _ezoSendTime    = millis();
+
+    d.humidityPct = _humidityPct;
+    d.humTemp     = _humTemp;
+    d.ezoHumOk    = _ezoHumOk;
 
     return d;
 }
