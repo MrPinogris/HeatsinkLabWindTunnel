@@ -472,7 +472,8 @@ Power Query formula (all current + future columns):
         {"airspeed", type number},
         {"delta_p1", type number},
         {"delta_p2", type number},
-        {"humidity_pct", type number}
+        {"humidity_pct", type number},
+        {"hum_temp_c", type number}
     },
     "en-US"
 )

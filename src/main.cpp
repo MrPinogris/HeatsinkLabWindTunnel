@@ -36,6 +36,10 @@ static float    pwmDitherAccumulator = 0.0f;
 // ── PWM slew-rate state ────────────────────────────────────────────────────────
 static int lastPWM = 0;
 
+// ── Extension sensor slot indices ─────────────────────────────────────────────
+static int8_t humSlot     = -1;
+static int8_t humTempSlot = -1;
+
 // ── Global instances ───────────────────────────────────────────────────────────
 SystemState     sys;
 PIDController   pid(8.0f, 0.06f, 0.0f);
@@ -166,12 +170,14 @@ void setup() {
     applyPidTunings();
     resetSmartState();
 
-    // ── Register extension sensors here when hardware is connected ────────
-    // Example (uncomment and adapt when sensor is wired):
+    // ── Register extension sensors ────────────────────────────────────────
     //   int8_t airspeedSlot = extSensors.registerSensor("AIRSPEED", "m/s");
     //   int8_t deltaP1Slot  = extSensors.registerSensor("DELTA_P1", "Pa");
     //   int8_t deltaP2Slot  = extSensors.registerSensor("DELTA_P2", "Pa");
-    //   int8_t humiditySlot = extSensors.registerSensor("HUMIDITY", "%RH");
+
+    // EZO-HUM humidity probe — I2C init handled in sensors.begin()
+    humSlot     = extSensors.registerSensor("HUMIDITY", "%");
+    humTempSlot = extSensors.registerSensor("HUM_TEMP", "C");
     // ─────────────────────────────────────────────────────────────────────
 
     Serial.println("System started");
@@ -188,11 +194,12 @@ void loop() {
     if ((now - lastControlMs) < CONTROL_PERIOD_MS) return;
     lastControlMs = now;
 
-    // ── Read all sensors ──────────────────────────────────────────────────
+    // ── Read all sensors (EZO-HUM cycle handled inside SensorManager) ───────
     CoreSensorData sd = sensors.read();
 
-    // ── Update extension sensor slots here when hardware is connected ─────
-    // Example:
+    // ── Update extension sensor slots ────────────────────────────────────
+    if (humSlot     >= 0) extSensors.update(humSlot,     sd.humidityPct);
+    if (humTempSlot >= 0) extSensors.update(humTempSlot, sd.humTemp);
     //   extSensors.update(airspeedSlot, readAirspeed());
     //   extSensors.update(deltaP1Slot,  readDeltaP1());
     // ─────────────────────────────────────────────────────────────────────
