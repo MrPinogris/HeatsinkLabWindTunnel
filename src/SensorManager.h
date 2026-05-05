@@ -57,6 +57,14 @@ struct CoreSensorData {
     float humTemp;       // ambient temperature from probe, °C
     bool  ezoHumOk;      // false if no valid response received yet
 
+    // ── Differential pressure sensors (analog, voltage divider → ADC) ─────────
+    // Ch1: GPIO PIN_PRESSURE1  |  Ch2: GPIO PIN_PRESSURE2 (set 0 if unused)
+    // Sensor: 0.25–4.0 V → 0–3500 Pa; divider R1=2.2kΩ top, R2=5.1kΩ bottom
+    float deltaP1Raw;    // channel 1, Pa — 32-sample oversampled
+    float deltaP1Filt;   // channel 1, Pa — EMA filtered (α=0.15)
+    float deltaP2Raw;    // channel 2, Pa — 0.0 if PIN_PRESSURE2 == 0
+    float deltaP2Filt;   // channel 2, Pa — EMA filtered (α=0.15)
+
     // ── Status flags ───────────────────────────────────────────────────────
     bool  tempStuck;     // true this tick if stuck-watchdog fired (heater cut)
 };
@@ -97,6 +105,10 @@ private:
     float    _humidityPct     = 0.0f;
     float    _humTemp         = 0.0f;
     bool     _ezoHumOk        = false;
+
+    // Differential pressure EMA state
+    float    _emaP1           = 0.0f;
+    float    _emaP2           = 0.0f;
 
     bool  isValidTemp(float t) const;
     float applyGlitchReject(float t);
