@@ -1754,6 +1754,7 @@ const CSV_COLUMN_GROUPS = {
   'PID Details': ['pwm','p_term','i_term','d_term','pid_out','pid_bias','setpoint_bias_c'],
   'Smart Mode':  ['mode','state','hold_pwm','enter_progress_pct','exit_progress_pct','run_state'],
   'Fan':         ['fan_speed_pct','fan_pwm_raw','fan_inverted','manual_pwm_cmd'],
+  'Pressure':    ['delta_p1_pa','delta_p1f_pa','delta_p2_pa','delta_p2f_pa'],
 };
 
 const CSV_EXCEL_TYPES = {
@@ -1765,6 +1766,8 @@ const CSV_EXCEL_TYPES = {
   mode:'type text', state:'type text', manual_pwm_cmd:'type number',
   hold_pwm:'type number', enter_progress_pct:'type number', exit_progress_pct:'type number',
   abs_error_c:'type number', run_state:'type text', fan_inverted:'Int64.Type', event:'type text',
+  delta_p1_pa:'type number', delta_p1f_pa:'type number',
+  delta_p2_pa:'type number', delta_p2f_pa:'type number',
 };
 
 function toggleExcelHelp() {
