@@ -37,8 +37,12 @@ static float    pwmDitherAccumulator = 0.0f;
 static int lastPWM = 0;
 
 // ── Extension sensor slot indices ─────────────────────────────────────────────
-static int8_t humSlot     = -1;
-static int8_t humTempSlot = -1;
+static int8_t humSlot      = -1;
+static int8_t humTempSlot  = -1;
+static int8_t deltaP1Slot  = -1;  // raw pressure ch1, Pa
+static int8_t deltaP1FSlot = -1;  // EMA-filtered pressure ch1, Pa
+static int8_t deltaP2Slot  = -1;  // raw pressure ch2, Pa
+static int8_t deltaP2FSlot = -1;  // EMA-filtered pressure ch2, Pa
 
 // ── Global instances ───────────────────────────────────────────────────────────
 SystemState     sys;
@@ -176,8 +180,14 @@ void setup() {
     //   int8_t deltaP2Slot  = extSensors.registerSensor("DELTA_P2", "Pa");
 
     // EZO-HUM humidity probe — I2C init handled in sensors.begin()
-    humSlot     = extSensors.registerSensor("HUMIDITY", "%");
-    humTempSlot = extSensors.registerSensor("HUM_TEMP", "C");
+    humSlot      = extSensors.registerSensor("HUMIDITY", "%");
+    humTempSlot  = extSensors.registerSensor("HUM_TEMP", "C");
+
+    // Differential pressure sensors — ADC init handled in sensors.begin()
+    deltaP1Slot  = extSensors.registerSensor("DELTA_P1",  "Pa");
+    deltaP1FSlot = extSensors.registerSensor("DELTA_P1F", "Pa");
+    deltaP2Slot  = extSensors.registerSensor("DELTA_P2",  "Pa");
+    deltaP2FSlot = extSensors.registerSensor("DELTA_P2F", "Pa");
     // ─────────────────────────────────────────────────────────────────────
 
     Serial.println("System started");
@@ -198,10 +208,12 @@ void loop() {
     CoreSensorData sd = sensors.read();
 
     // ── Update extension sensor slots ────────────────────────────────────
-    if (humSlot     >= 0) extSensors.update(humSlot,     sd.humidityPct);
-    if (humTempSlot >= 0) extSensors.update(humTempSlot, sd.humTemp);
-    //   extSensors.update(airspeedSlot, readAirspeed());
-    //   extSensors.update(deltaP1Slot,  readDeltaP1());
+    if (humSlot      >= 0) extSensors.update(humSlot,      sd.humidityPct);
+    if (humTempSlot  >= 0) extSensors.update(humTempSlot,  sd.humTemp);
+    if (deltaP1Slot  >= 0) extSensors.update(deltaP1Slot,  sd.deltaP1Raw);
+    if (deltaP1FSlot >= 0) extSensors.update(deltaP1FSlot, sd.deltaP1Filt);
+    if (deltaP2Slot  >= 0) extSensors.update(deltaP2Slot,  sd.deltaP2Raw);
+    if (deltaP2FSlot >= 0) extSensors.update(deltaP2FSlot, sd.deltaP2Filt);
     // ─────────────────────────────────────────────────────────────────────
 
     // ── Thermocouple fault: cut heater immediately ─────────────────────────
