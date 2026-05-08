@@ -1026,6 +1026,13 @@ setTimeout(resizeChart, 100);
 // ---------------------------------------------------------------------------
 // Chart update
 // ---------------------------------------------------------------------------
+let _chartRafPending = false;
+function scheduleChartUpdate() {
+  if (_chartRafPending) return;
+  _chartRafPending = true;
+  requestAnimationFrame(() => { _chartRafPending = false; updateChart(); });
+}
+
 function updateChart() {
   const maxPts = parseInt(document.getElementById('maxPts').value) || 5000;
   const windowSec = parseFloat(document.getElementById('windowSec').value) || 120;
@@ -1188,7 +1195,7 @@ function handleMsg(msg) {
   if (msg.type === 'telemetry') {
     updateTelemetry(msg);
     pushHistory(msg);
-    updateChart();
+    scheduleChartUpdate();
     if (testerActive) testerOnTelemetry(msg);
     return;
   }
@@ -1215,7 +1222,7 @@ function handleMsg(msg) {
   if (msg.type === 'marker') {
     const lastTs = history.ts.length ? history.ts[history.ts.length - 1] : 0;
     markers.push({ ts: lastTs, label: msg.label });
-    updateChart();
+    scheduleChartUpdate();
     appendLog(`[MARKER] ${msg.label}`, 'info');
     return;
   }

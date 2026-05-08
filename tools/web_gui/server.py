@@ -158,15 +158,31 @@ class AppState:
         if not self.websockets:
             return
         text = json.dumps(msg)
-        dead: list[WebSocket] = []
+        # Snapshot the list under the lock (no IO while holding it).
         async with self.ws_lock:
-            for ws in list(self.websockets):
-                try:
-                    await ws.send_text(text)
-                except Exception:
-                    dead.append(ws)
-            for ws in dead:
-                self.websockets.remove(ws)
+            targets = list(self.websockets)
+        if not targets:
+            return
+        # Send to all clients concurrently; enforce a per-client timeout so a
+        # slow or backgrounded browser tab cannot stall everyone else.
+        results = await asyncio.gather(
+            *(self._send_one(ws, text) for ws in targets),
+            return_exceptions=True,
+        )
+        dead = [ws for ws, ok in zip(targets, results) if ok is not True]
+        if dead:
+            async with self.ws_lock:
+                for ws in dead:
+                    if ws in self.websockets:
+                        self.websockets.remove(ws)
+
+    @staticmethod
+    async def _send_one(ws: "WebSocket", text: str) -> bool:
+        try:
+            await asyncio.wait_for(ws.send_text(text), timeout=3.0)
+            return True
+        except Exception:
+            return False
 
     def broadcast_sync(self, msg: dict) -> None:
         """Thread-safe broadcast from serial reader thread."""
@@ -278,7 +294,11 @@ class AppState:
             if not line:
                 continue
 
-            self.broadcast_sync({"type": "log", "text": line})
+            # Telemetry lines are re-broadcast as structured 'telemetry' messages
+            # by _handle_line — skip the redundant raw-text log broadcast for them
+            # to halve WebSocket traffic and prevent asyncio task queue build-up.
+            if not TELEMETRY_RE.search(line):
+                self.broadcast_sync({"type": "log", "text": line})
             self._handle_line(line)
 
             # Handshake check
