@@ -127,6 +127,9 @@ class AppState:
         # Saved UI state
         self.saved_state: dict[str, str] = self._load_state()
 
+        # Pressure tare offsets — subtracted from raw/filtered Pa readings
+        self.pressure_zero: dict[str, float] = {"p1": 0.0, "p1f": 0.0, "p2": 0.0, "p2f": 0.0}
+
     # ------------------------------------------------------------------
     # State persistence
     # ------------------------------------------------------------------
@@ -334,6 +337,13 @@ class AppState:
             delta_p1f    = float(m.group(31)) if m.group(31) is not None else None
             delta_p2     = float(m.group(32)) if m.group(32) is not None else None
             delta_p2f    = float(m.group(33)) if m.group(33) is not None else None
+
+            # Apply software tare offsets (zeroed by /api/pressure/tare)
+            pz = self.pressure_zero
+            if delta_p1  is not None: delta_p1  -= pz["p1"]
+            if delta_p1f is not None: delta_p1f -= pz["p1f"]
+            if delta_p2  is not None: delta_p2  -= pz["p2"]
+            if delta_p2f is not None: delta_p2f -= pz["p2f"]
 
             now_iso = dt.datetime.now(dt.timezone.utc).astimezone().isoformat(timespec="milliseconds")
 
@@ -987,6 +997,37 @@ async def get_status() -> JSONResponse:
         "csv_path": str(state.csv_path) if state.csv_path else "",
         "handshake_ok": state.handshake_ok,
     })
+
+
+# ---------------------------------------------------------------------------
+# Pressure tare
+# ---------------------------------------------------------------------------
+@app.post("/api/pressure/tare")
+async def pressure_tare() -> JSONResponse:
+    """Record current pressure readings as the zero baseline (subtract going forward).
+
+    last_telemetry already has the previous offset subtracted, so accumulate:
+      new_abs_offset = old_offset + current_display_value
+    This ensures repeated tare calls always converge to 0 display.
+    """
+    lt = state.last_telemetry
+    pz = state.pressure_zero
+    state.pressure_zero = {
+        "p1":  pz["p1"]  + (lt.get("delta_p1")  or 0.0),
+        "p1f": pz["p1f"] + (lt.get("delta_p1f") or 0.0),
+        "p2":  pz["p2"]  + (lt.get("delta_p2")  or 0.0),
+        "p2f": pz["p2f"] + (lt.get("delta_p2f") or 0.0),
+    }
+    await state.broadcast({"type": "pressure_tare", "offsets": state.pressure_zero})
+    return JSONResponse({"ok": True, "offsets": state.pressure_zero})
+
+
+@app.post("/api/pressure/tare_reset")
+async def pressure_tare_reset() -> JSONResponse:
+    """Clear pressure tare — readings are shown as raw sensor values again."""
+    state.pressure_zero = {"p1": 0.0, "p1f": 0.0, "p2": 0.0, "p2f": 0.0}
+    await state.broadcast({"type": "pressure_tare", "offsets": state.pressure_zero})
+    return JSONResponse({"ok": True})
 
 
 # ---------------------------------------------------------------------------
