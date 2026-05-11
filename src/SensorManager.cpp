@@ -39,7 +39,6 @@ void SensorManager::begin(float emaAlphaInit) {
     _emaAlpha = emaAlphaInit;
 
     Wire.begin(PIN_SDA, PIN_SCL);
-    Wire.setTimeOut(200);  // SDP610 clock-stretches up to 80ms; default timeout is too short
 
     // EZO-HUM: enable temperature output, disable dew point (sent once at boot)
     Wire.beginTransmission(EZO_HUM_ADDR);
