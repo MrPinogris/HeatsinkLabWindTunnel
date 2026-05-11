@@ -21,20 +21,14 @@ static const float MAX_JUMP_C       = 100.0f; // glitch reject: max allowed sing
 static const float STUCK_EPSILON_C  = 0.01f;  // below this delta → "same" reading
 static const uint16_t STUCK_LIMIT   = 30;     // consecutive "same" ticks before stuck declared
 
-// ── Differential pressure sensor ADC ─────────────────────────────────────────
-// Set PIN_PRESSURE2 to 0 to disable channel 2 (leave unconnected).
-static const int   PIN_PRESSURE1  = 6;       // GPIO for sensor 1 ADC input
-static const int   PIN_PRESSURE2  = 7;       // GPIO for sensor 2 ADC input (0 = unused)
-static const float P_R1           = 2200.0f; // voltage divider top resistor, Ω
-static const float P_R2           = 5100.0f; // voltage divider bottom resistor, Ω
-static const float P_DIV_GAIN     = P_R2 / (P_R1 + P_R2); // ~0.6986
-static const float P_VREF         = 3.3f;    // ADC reference voltage
-static const int   P_N_SAMPLES    = 32;      // oversampling count
-static const float P_EMA_ALPHA    = 0.15f;   // EMA smoothing factor
+// ── SDP510 differential pressure sensor (I2C) ────────────────────────────────
+static const uint8_t SDP610_ADDR      = 0x40;  // fixed I2C address
+static const float   SDP610_SCALE     = 60.0f; // counts/Pa (500 Pa range variant)
+static const float   SDP610_EMA_ALPHA = 0.15f; // EMA smoothing factor
 
 // ── Sensor objects ────────────────────────────────────────────────────────────
 static MAX6675 thermocouple(PIN_SCK, PIN_CS, PIN_SO);
-static INA226  ina226(0x40);
+static INA226  ina226(0x41);  // A0 wired to VCC → address 0x41
 
 // ── Singleton instance ────────────────────────────────────────────────────────
 SensorManager sensors;
@@ -45,6 +39,7 @@ void SensorManager::begin(float emaAlphaInit) {
     _emaAlpha = emaAlphaInit;
 
     Wire.begin(PIN_SDA, PIN_SCL);
+    Wire.setTimeOut(200);  // SDP610 clock-stretches up to 80ms; default timeout is too short
 
     // EZO-HUM: enable temperature output, disable dew point (sent once at boot)
     Wire.beginTransmission(EZO_HUM_ADDR);
@@ -56,26 +51,28 @@ void SensorManager::begin(float emaAlphaInit) {
     Wire.endTransmission();
     delay(300);
 
-    // Configure ADC pins for pressure sensors (11dB = 0-3.3V range)
-    analogReadResolution(12);
-    if (PIN_PRESSURE1 > 0) analogSetPinAttenuation(PIN_PRESSURE1, ADC_11db);
-    if (PIN_PRESSURE2 > 0) analogSetPinAttenuation(PIN_PRESSURE2, ADC_11db);
-
-    // Seed EMA with first pressure reading so filter starts from a real value
-    if (PIN_PRESSURE1 > 0) {
-        uint32_t acc = 0;
-        for (int i = 0; i < P_N_SAMPLES; i++) { acc += analogRead(PIN_PRESSURE1); }
-        float vPin = ((float)acc / P_N_SAMPLES) / 4095.0f * P_VREF;
-        float vSens = vPin / P_DIV_GAIN;
-        _emaP1 = 3500.0f * constrain((vSens - 0.25f) / 3.75f, 0.0f, 1.0f);
+    // SDP510: trigger first measurement, then read back to confirm sensor present
+    Wire.beginTransmission(SDP610_ADDR);
+    Wire.write(0xF1);
+    uint8_t sdpErr = Wire.endTransmission();
+    if (sdpErr != 0) {
+        Serial.printf("SDP510 NOT FOUND – trigger error %u (check wiring SDA=15 SCL=16)\n", sdpErr);
+    } else {
+        // sensor will clock-stretch on requestFrom; read back first measurement
+        if (Wire.requestFrom((uint8_t)SDP610_ADDR, (uint8_t)3) == 3) {
+            uint8_t msb = Wire.read();
+            uint8_t lsb = Wire.read();
+            Wire.read();  // CRC
+            int16_t raw = (int16_t)((uint16_t)(msb << 8) | lsb);
+            float pa = (float)raw / SDP610_SCALE;
+            _emaP1 = pa;  // seed EMA with first real reading
+            Serial.printf("SDP510 OK – first reading: %.2f Pa\n", pa);
+        } else {
+            Serial.println("SDP510 found but read timed out – check Wire.setTimeOut()");
+            _emaP1 = 0.0f;
+        }
     }
-    if (PIN_PRESSURE2 > 0) {
-        uint32_t acc = 0;
-        for (int i = 0; i < P_N_SAMPLES; i++) { acc += analogRead(PIN_PRESSURE2); }
-        float vPin = ((float)acc / P_N_SAMPLES) / 4095.0f * P_VREF;
-        float vSens = vPin / P_DIV_GAIN;
-        _emaP2 = 3500.0f * constrain((vSens - 0.25f) / 3.75f, 0.0f, 1.0f);
-    }
+    _emaP2 = 0.0f;
 
     _inaOk = ina226.begin();
     if (_inaOk) {
@@ -166,33 +163,25 @@ CoreSensorData SensorManager::read() {
     d.humTemp     = _humTemp;
     d.ezoHumOk    = _ezoHumOk;
 
-    // ── Differential pressure sensors ──────────────────────────────────────
-    auto readPressurePa = [](int pin, float &ema) -> float {
-        // 32-sample oversampled read
-        uint32_t acc = 0;
-        for (int i = 0; i < P_N_SAMPLES; i++) {
-            acc += analogRead(pin);
-            delayMicroseconds(200);
-        }
-        float vPin  = ((float)acc / P_N_SAMPLES) / 4095.0f * P_VREF;
-        float vSens = vPin / P_DIV_GAIN;                      // undo divider
-        float raw   = 3500.0f * constrain((vSens - 0.25f) / 3.75f, 0.0f, 1.0f);
-        ema = P_EMA_ALPHA * raw + (1.0f - P_EMA_ALPHA) * ema; // EMA
-        return raw;
-    };
-
-    if (PIN_PRESSURE1 > 0) {
-        d.deltaP1Raw  = readPressurePa(PIN_PRESSURE1, _emaP1);
+    // ── SDP610 differential pressure (I2C, clock-stretching single-shot) ──────
+    Wire.beginTransmission(SDP610_ADDR);
+    Wire.write(0xF1);
+    Wire.endTransmission();
+    if (Wire.requestFrom((uint8_t)SDP610_ADDR, (uint8_t)3) == 3) {
+        uint8_t msb = Wire.read();
+        uint8_t lsb = Wire.read();
+        Wire.read();  // CRC — discard (factory-calibrated sensor)
+        int16_t raw = (int16_t)((uint16_t)(msb << 8) | lsb);
+        float pa = (float)raw / SDP610_SCALE;
+        _emaP1 = SDP610_EMA_ALPHA * pa + (1.0f - SDP610_EMA_ALPHA) * _emaP1;
+        d.deltaP1Raw  = pa;
         d.deltaP1Filt = _emaP1;
     } else {
-        d.deltaP1Raw = d.deltaP1Filt = 0.0f;
+        d.deltaP1Raw  = _emaP1;  // hold last good on I2C failure
+        d.deltaP1Filt = _emaP1;
     }
-    if (PIN_PRESSURE2 > 0) {
-        d.deltaP2Raw  = readPressurePa(PIN_PRESSURE2, _emaP2);
-        d.deltaP2Filt = _emaP2;
-    } else {
-        d.deltaP2Raw = d.deltaP2Filt = 0.0f;
-    }
+    d.deltaP2Raw  = 0.0f;  // no second pressure channel
+    d.deltaP2Filt = 0.0f;
 
     return d;
 }

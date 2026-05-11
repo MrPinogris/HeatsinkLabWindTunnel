@@ -57,13 +57,13 @@ struct CoreSensorData {
     float humTemp;       // ambient temperature from probe, °C
     bool  ezoHumOk;      // false if no valid response received yet
 
-    // ── Differential pressure sensors (analog, voltage divider → ADC) ─────────
-    // Ch1: GPIO PIN_PRESSURE1  |  Ch2: GPIO PIN_PRESSURE2 (set 0 if unused)
-    // Sensor: 0.25–4.0 V → 0–3500 Pa; divider R1=2.2kΩ top, R2=5.1kΩ bottom
-    float deltaP1Raw;    // channel 1, Pa — 32-sample oversampled
+    // ── Differential pressure sensor (SDP510, I2C 0x40) ──────────────────────
+    // Ch1: SDP510 via I2C (SDA=GPIO15, SCL=GPIO16) | Ch2: unused (always 0)
+    // Range: ±500 Pa, scale factor 60 counts/Pa, factory calibrated
+    float deltaP1Raw;    // channel 1, Pa — direct SDP610 reading
     float deltaP1Filt;   // channel 1, Pa — EMA filtered (α=0.15)
-    float deltaP2Raw;    // channel 2, Pa — 0.0 if PIN_PRESSURE2 == 0
-    float deltaP2Filt;   // channel 2, Pa — EMA filtered (α=0.15)
+    float deltaP2Raw;    // channel 2, Pa — always 0.0 (no second sensor)
+    float deltaP2Filt;   // channel 2, Pa — always 0.0 (no second sensor)
 
     // ── Status flags ───────────────────────────────────────────────────────
     bool  tempStuck;     // true this tick if stuck-watchdog fired (heater cut)

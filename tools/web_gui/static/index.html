@@ -533,6 +533,11 @@
           <div class="telem-item"><span class="telem-label">ΔP1 Filt (Pa)</span><span class="telem-value" id="tDeltaP1F">-</span></div>
           <div class="telem-item"><span class="telem-label">ΔP2 Raw (Pa)</span><span class="telem-value" id="tDeltaP2">-</span></div>
           <div class="telem-item"><span class="telem-label">ΔP2 Filt (Pa)</span><span class="telem-value" id="tDeltaP2F">-</span></div>
+          <div style="display:flex;gap:6px;margin-top:4px;">
+            <button id="btnPTare" onclick="pressureTare()" style="flex:1;padding:4px 6px;font-size:11px;background:#2563eb;color:#fff;border:none;border-radius:4px;cursor:pointer;" title="Zero all pressure channels using current reading as baseline">Zero ΔP</button>
+            <button id="btnPTareReset" onclick="pressureTareReset()" style="flex:1;padding:4px 6px;font-size:11px;background:#374151;color:#d1d5db;border:none;border-radius:4px;cursor:pointer;" title="Remove pressure zero offset — show raw sensor values">Reset Zero</button>
+          </div>
+          <div id="pTareStatus" style="font-size:10px;color:#6b7280;margin-top:2px;text-align:center;"></div>
         </div>
       </div>
 
@@ -1021,6 +1026,13 @@ setTimeout(resizeChart, 100);
 // ---------------------------------------------------------------------------
 // Chart update
 // ---------------------------------------------------------------------------
+let _chartRafPending = false;
+function scheduleChartUpdate() {
+  if (_chartRafPending) return;
+  _chartRafPending = true;
+  requestAnimationFrame(() => { _chartRafPending = false; updateChart(); });
+}
+
 function updateChart() {
   const maxPts = parseInt(document.getElementById('maxPts').value) || 5000;
   const windowSec = parseFloat(document.getElementById('windowSec').value) || 120;
@@ -1183,7 +1195,7 @@ function handleMsg(msg) {
   if (msg.type === 'telemetry') {
     updateTelemetry(msg);
     pushHistory(msg);
-    updateChart();
+    scheduleChartUpdate();
     if (testerActive) testerOnTelemetry(msg);
     return;
   }
@@ -1198,10 +1210,19 @@ function handleMsg(msg) {
     return;
   }
 
+  if (msg.type === 'pressure_tare') {
+    const o = msg.offsets;
+    const allZero = o.p1 === 0 && o.p2 === 0;
+    document.getElementById('pTareStatus').textContent = allZero
+      ? 'Offset cleared — showing raw values'
+      : `Zeroed: P1=${o.p1.toFixed(1)} Pa  P2=${o.p2.toFixed(1)} Pa`;
+    return;
+  }
+
   if (msg.type === 'marker') {
     const lastTs = history.ts.length ? history.ts[history.ts.length - 1] : 0;
     markers.push({ ts: lastTs, label: msg.label });
-    updateChart();
+    scheduleChartUpdate();
     appendLog(`[MARKER] ${msg.label}`, 'info');
     return;
   }
@@ -1411,6 +1432,20 @@ async function sendCmd(cmd) {
   if (!serialConnected) { alert('Not connected.'); return; }
   appendLog('→ ' + cmd, 'sent');
   await api('/api/command', 'POST', { command: cmd });
+}
+
+async function pressureTare() {
+  const r = await api('/api/pressure/tare', 'POST', {});
+  if (r && r.ok) {
+    const o = r.offsets;
+    document.getElementById('pTareStatus').textContent =
+      `Zeroed: P1=${o.p1.toFixed(1)} Pa  P2=${o.p2.toFixed(1)} Pa`;
+  }
+}
+
+async function pressureTareReset() {
+  await api('/api/pressure/tare_reset', 'POST', {});
+  document.getElementById('pTareStatus').textContent = 'Offset cleared — showing raw values';
 }
 
 function setParam(key) {
