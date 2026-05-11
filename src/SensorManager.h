@@ -57,8 +57,8 @@ struct CoreSensorData {
     float humTemp;       // ambient temperature from probe, °C
     bool  ezoHumOk;      // false if no valid response received yet
 
-    // ── Differential pressure sensor (SDP610, I2C 0x40) ──────────────────────
-    // Ch1: SDP610 via I2C (SDA=GPIO15, SCL=GPIO16) | Ch2: unused (always 0)
+    // ── Differential pressure sensor (SDP510, I2C 0x40) ──────────────────────
+    // Ch1: SDP510 via I2C (SDA=GPIO15, SCL=GPIO16) | Ch2: unused (always 0)
     // Range: ±500 Pa, scale factor 60 counts/Pa, factory calibrated
     float deltaP1Raw;    // channel 1, Pa — direct SDP610 reading
     float deltaP1Filt;   // channel 1, Pa — EMA filtered (α=0.15)

@@ -21,7 +21,7 @@ static const float MAX_JUMP_C       = 100.0f; // glitch reject: max allowed sing
 static const float STUCK_EPSILON_C  = 0.01f;  // below this delta → "same" reading
 static const uint16_t STUCK_LIMIT   = 30;     // consecutive "same" ticks before stuck declared
 
-// ── SDP610 differential pressure sensor (I2C) ────────────────────────────────
+// ── SDP510 differential pressure sensor (I2C) ────────────────────────────────
 static const uint8_t SDP610_ADDR      = 0x40;  // fixed I2C address
 static const float   SDP610_SCALE     = 60.0f; // counts/Pa (500 Pa range variant)
 static const float   SDP610_EMA_ALPHA = 0.15f; // EMA smoothing factor
@@ -51,11 +51,27 @@ void SensorManager::begin(float emaAlphaInit) {
     Wire.endTransmission();
     delay(300);
 
-    // SDP610: trigger first measurement; sensor will be ready by first read()
+    // SDP510: trigger first measurement, then read back to confirm sensor present
     Wire.beginTransmission(SDP610_ADDR);
     Wire.write(0xF1);
-    Wire.endTransmission();
-    _emaP1 = 0.0f;
+    uint8_t sdpErr = Wire.endTransmission();
+    if (sdpErr != 0) {
+        Serial.printf("SDP510 NOT FOUND – trigger error %u (check wiring SDA=15 SCL=16)\n", sdpErr);
+    } else {
+        // sensor will clock-stretch on requestFrom; read back first measurement
+        if (Wire.requestFrom((uint8_t)SDP610_ADDR, (uint8_t)3) == 3) {
+            uint8_t msb = Wire.read();
+            uint8_t lsb = Wire.read();
+            Wire.read();  // CRC
+            int16_t raw = (int16_t)((uint16_t)(msb << 8) | lsb);
+            float pa = (float)raw / SDP610_SCALE;
+            _emaP1 = pa;  // seed EMA with first real reading
+            Serial.printf("SDP510 OK – first reading: %.2f Pa\n", pa);
+        } else {
+            Serial.println("SDP510 found but read timed out – check Wire.setTimeOut()");
+            _emaP1 = 0.0f;
+        }
+    }
     _emaP2 = 0.0f;
 
     _inaOk = ina226.begin();
