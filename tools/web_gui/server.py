@@ -358,8 +358,20 @@ class AppState:
             delta_p2     = float(m.group(32)) if m.group(32) is not None else None
             delta_p2f    = float(m.group(33)) if m.group(33) is not None else None
 
+            # SDP2000-L datasheet correction (applied before tare).
+            # Firmware maps 0.25 V → 0 Pa, but the sensor maps 0.25 V → −100 Pa
+            # (range −100 to 3500 Pa, output 0.25 V to 4.0 V).
+            # Correct: Pa_true = Pa_firmware × (3600/3500) − 100
+            _SDP_SCALE  = 3600 / 3500  # 1.02857 — fixes 2.86 % span error
+            _SDP_OFFSET = -100.0
+            def _sdp(pa: float | None) -> float | None:
+                return pa * _SDP_SCALE + _SDP_OFFSET if pa is not None else None
+            delta_p1  = _sdp(delta_p1)
+            delta_p1f = _sdp(delta_p1f)
+            delta_p2  = _sdp(delta_p2)
+            delta_p2f = _sdp(delta_p2f)
+
             # Apply software tare offsets (zeroed by /api/pressure/tare)
-            # SDP610 is factory calibrated — no scale/offset correction needed here
             pz = self.pressure_zero
             if delta_p1  is not None: delta_p1  -= pz["p1"]
             if delta_p1f is not None: delta_p1f -= pz["p1f"]
