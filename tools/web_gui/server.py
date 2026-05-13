@@ -802,7 +802,7 @@ async def on_shutdown() -> None:
 # ---------------------------------------------------------------------------
 @app.get("/")
 async def root() -> FileResponse:
-    return FileResponse(str(STATIC_DIR / "index.html"))
+    return FileResponse(str(STATIC_DIR / "index.html"), headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/ports")
