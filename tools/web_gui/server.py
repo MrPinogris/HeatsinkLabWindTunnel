@@ -280,18 +280,22 @@ class AppState:
     # Reader loop (runs in background thread)
     # ------------------------------------------------------------------
     def _reader_loop(self) -> None:
+        last_get_time = time.monotonic()
         while not self.reader_stop.is_set():
             if not self.serial_conn:
                 break
             try:
                 line = self.serial_conn.readline().decode("utf-8", errors="replace").strip()
             except Exception as exc:
+                print(f"[serial] read error: {exc}", flush=True)
                 self.broadcast_sync({"type": "log", "text": f"Serial read error: {exc}"})
                 self.broadcast_sync({"type": "disconnected", "reason": str(exc)})
                 self.connected = False
                 break
 
             if line:
+                if self.awaiting_handshake:
+                    print(f"[handshake] rx: {line[:80]!r}", flush=True)
                 # Telemetry lines are re-broadcast as structured 'telemetry' messages
                 # by _handle_line — skip the redundant raw-text log broadcast for them
                 # to halve WebSocket traffic and prevent asyncio task queue build-up.
@@ -303,10 +307,12 @@ class AppState:
             # so the deadline fires even if the ESP sends nothing (e.g. post-reset boot)
             if self.awaiting_handshake:
                 if line.startswith("CFG ") or line.startswith("Rawtemp "):
+                    print("[handshake] OK", flush=True)
                     self.handshake_ok = True
                     self.awaiting_handshake = False
                     self.broadcast_sync({"type": "handshake_ok"})
                 elif time.monotonic() > self.handshake_deadline:
+                    print("[handshake] TIMEOUT — no CFG/Rawtemp received", flush=True)
                     self.awaiting_handshake = False
                     self.connected = False
                     self.reader_stop.set()
@@ -319,6 +325,14 @@ class AppState:
                     self.broadcast_sync({"type": "handshake_fail"})
                     self.broadcast_sync({"type": "disconnected", "reason": "handshake_fail"})
                     break
+                else:
+                    # Re-send GET every 1.5 s — ESP may have reset on port-open and
+                    # missed the first GET while still booting
+                    now = time.monotonic()
+                    if now - last_get_time >= 1.5:
+                        print("[handshake] retrying GET...", flush=True)
+                        self._write_serial("GET")
+                        last_get_time = now
 
     def _handle_line(self, line: str) -> None:
         m = TELEMETRY_RE.search(line)
