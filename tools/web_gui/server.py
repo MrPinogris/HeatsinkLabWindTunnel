@@ -229,7 +229,7 @@ class AppState:
             self.connected = True
             self.awaiting_handshake = True
             self.handshake_ok = False
-            self.handshake_deadline = time.monotonic() + 2.5
+            self.handshake_deadline = time.monotonic() + 5.0
             self.reader_stop.clear()
             self.reader_thread = threading.Thread(target=self._reader_loop, daemon=True)
             self.reader_thread.start()
@@ -291,17 +291,16 @@ class AppState:
                 self.connected = False
                 break
 
-            if not line:
-                continue
+            if line:
+                # Telemetry lines are re-broadcast as structured 'telemetry' messages
+                # by _handle_line — skip the redundant raw-text log broadcast for them
+                # to halve WebSocket traffic and prevent asyncio task queue build-up.
+                if not TELEMETRY_RE.search(line):
+                    self.broadcast_sync({"type": "log", "text": line})
+                self._handle_line(line)
 
-            # Telemetry lines are re-broadcast as structured 'telemetry' messages
-            # by _handle_line — skip the redundant raw-text log broadcast for them
-            # to halve WebSocket traffic and prevent asyncio task queue build-up.
-            if not TELEMETRY_RE.search(line):
-                self.broadcast_sync({"type": "log", "text": line})
-            self._handle_line(line)
-
-            # Handshake check
+            # Handshake check — runs on every loop iteration (including empty reads)
+            # so the deadline fires even if the ESP sends nothing (e.g. post-reset boot)
             if self.awaiting_handshake:
                 if line.startswith("CFG ") or line.startswith("Rawtemp "):
                     self.handshake_ok = True
