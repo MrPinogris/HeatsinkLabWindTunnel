@@ -802,6 +802,11 @@ async def on_shutdown() -> None:
 # ---------------------------------------------------------------------------
 @app.get("/")
 async def root() -> FileResponse:
+    return FileResponse(str(STATIC_DIR / "student.html"))
+
+
+@app.get("/advanced")
+async def advanced() -> FileResponse:
     return FileResponse(str(STATIC_DIR / "index.html"))
 
 

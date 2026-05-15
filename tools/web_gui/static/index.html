@@ -295,7 +295,8 @@
     <button class="small" id="btnTesterMode" onclick="enterTesterMode()" style="margin-left:8px;" title="Open automated heatsink characterisation mode">&#128300; Tester</button>
     <button class="small" id="btnAddMarker" onclick="addMarker()" style="display:none;" title="Add a phase marker annotation to the chart and CSV">&#128204; Marker</button>
     <button class="small" id="btnExpertMode" onclick="toggleExpertMode()" title="Student mode hides advanced parameters to simplify the interface">&#127891; Student</button>
-    <span style="display:flex;align-items:center;gap:4px;margin-left:auto;">
+    <span style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+      <a href="/" style="color:var(--text-muted);text-decoration:none;font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:4px;white-space:nowrap;transition:color .15s,border-color .15s;" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">← Student View</a>
       <span class="ws-dot" id="wsDot"></span>
       <span id="wsLabel" style="font-size:11px;color:var(--text-muted)">WebSocket</span>
     </span>
