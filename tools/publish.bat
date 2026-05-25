@@ -28,18 +28,30 @@ if errorlevel 1 (
 :: ---- Copy files ----
 echo [publish] Copying files...
 
-xcopy /Y /I "%PRIVATE_ROOT%\src\main.cpp"              "%TEMP_DIR%\src\"
-xcopy /Y /I "%PRIVATE_ROOT%\src\PIDController.cpp"     "%TEMP_DIR%\src\"
-xcopy /Y /I "%PRIVATE_ROOT%\src\PIDController.h"       "%TEMP_DIR%\src\"
-xcopy /Y /I "%PRIVATE_ROOT%\include\README"             "%TEMP_DIR%\include\"
-xcopy /Y /I "%PRIVATE_ROOT%\lib\README"                 "%TEMP_DIR%\lib\"
-xcopy /Y /I "%PRIVATE_ROOT%\platformio.ini"             "%TEMP_DIR%\"
-xcopy /Y /I "%PRIVATE_ROOT%\README.md"                  "%TEMP_DIR%\"
-xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\server.py"          "%TEMP_DIR%\tools\web_gui\"
-xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\requirements.txt"   "%TEMP_DIR%\tools\web_gui\"
-xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\static\index.html"  "%TEMP_DIR%\tools\web_gui\static\"
-xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\MANUAL.md"          "%TEMP_DIR%\tools\web_gui\"
-xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\start.bat"          "%TEMP_DIR%\tools\web_gui\"
+:: Firmware source
+xcopy /Y /I "%PRIVATE_ROOT%\src\main.cpp"                  "%TEMP_DIR%\src\"
+xcopy /Y /I "%PRIVATE_ROOT%\src\PIDController.cpp"         "%TEMP_DIR%\src\"
+xcopy /Y /I "%PRIVATE_ROOT%\src\PIDController.h"           "%TEMP_DIR%\src\"
+xcopy /Y /I "%PRIVATE_ROOT%\src\SensorManager.cpp"         "%TEMP_DIR%\src\"
+xcopy /Y /I "%PRIVATE_ROOT%\src\SensorManager.h"           "%TEMP_DIR%\src\"
+xcopy /Y /I "%PRIVATE_ROOT%\src\SerialProtocol.cpp"        "%TEMP_DIR%\src\"
+xcopy /Y /I "%PRIVATE_ROOT%\src\SerialProtocol.h"          "%TEMP_DIR%\src\"
+xcopy /Y /I "%PRIVATE_ROOT%\src\ExtSensorRegistry.cpp"     "%TEMP_DIR%\src\"
+xcopy /Y /I "%PRIVATE_ROOT%\src\ExtSensorRegistry.h"       "%TEMP_DIR%\src\"
+xcopy /Y /I "%PRIVATE_ROOT%\src\SystemState.h"             "%TEMP_DIR%\src\"
+xcopy /Y /I "%PRIVATE_ROOT%\include\README"                 "%TEMP_DIR%\include\"
+xcopy /Y /I "%PRIVATE_ROOT%\lib\README"                     "%TEMP_DIR%\lib\"
+xcopy /Y /I "%PRIVATE_ROOT%\platformio.ini"                 "%TEMP_DIR%\"
+xcopy /Y /I "%PRIVATE_ROOT%\README.md"                      "%TEMP_DIR%\"
+
+:: Web GUI
+xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\server.py"               "%TEMP_DIR%\tools\web_gui\"
+xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\requirements.txt"        "%TEMP_DIR%\tools\web_gui\"
+xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\start.bat"               "%TEMP_DIR%\tools\web_gui\"
+xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\MANUAL.md"               "%TEMP_DIR%\tools\web_gui\"
+xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\static\index.html"       "%TEMP_DIR%\tools\web_gui\static\"
+xcopy /Y /I "%PRIVATE_ROOT%\tools\web_gui\static\student.html"     "%TEMP_DIR%\tools\web_gui\static\"
+xcopy /Y /E /I "%PRIVATE_ROOT%\tools\web_gui\static\media"         "%TEMP_DIR%\tools\web_gui\static\media\"
 
 :: Write a trimmed .gitignore for the public repo
 (
