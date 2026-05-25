@@ -9,8 +9,12 @@
   "maxstep": "25",
   "entercnt": "400",
   "exitcnt": "50",
-  "fan": "1.0",
-  "manpwm": "30.00",
-  "ctrl_mode": "SMART",
-  "fan_inv": "1"
+  "fan": "100.0",
+  "manpwm": "17.50",
+  "ctrl_mode": "MANUAL",
+  "fan_inv": "1",
+  "expert_mode": "1",
+  "run_id": "",
+  "heatsink_id": "",
+  "csv_columns": "[\"timestamp_iso\",\"elapsed_s\",\"event\",\"delta_p2_pa\",\"delta_p2f_pa\"]"
 }

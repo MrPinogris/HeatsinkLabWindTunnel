@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git pull *)",
+      "Bash(git add *)",
+      "Bash(git commit --only platformio.ini tools/i2c_scanner/main.cpp -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'feat: add I2C bus scanner diagnostic tool' --body ' *)"
+    ]
+  }
+}
