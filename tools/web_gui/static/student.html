@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HeatsinkLab Wind Tunnel</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #1a1a1e;
+    --surface: #25252b;
+    --surface2: #2e2e36;
+    --border: #3a3a45;
+    --accent: #4f9cf9;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --input-bg: #1e1e24;
+    --radius: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-title { font-size: 18px; font-weight: 700; color: var(--accent); }
+  .header-spacer { flex: 1; }
+  .header a.adv-link {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 12px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: color .15s, border-color .15s;
+  }
+  .header a.adv-link:hover { color: var(--accent); border-color: var(--accent); }
+  .status-pill {
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--surface2);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    transition: all .2s;
+  }
+  .status-pill.connected { background: rgba(34,197,94,.15); color: var(--green); border-color: var(--green); }
+  .status-pill.warning   { background: rgba(234,179,8,.15);  color: var(--yellow); border-color: var(--yellow); }
+  .status-pill.error     { background: rgba(239,68,68,.15);  color: var(--red);    border-color: var(--red); }
+
+  /* LAYOUT */
+  .main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .step-badge {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: background .2s;
+  }
+  .step-badge.done { background: var(--green); }
+  .card-title { font-size: 15px; font-weight: 600; }
+  .card-subtitle { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+
+  /* FORM */
+  input[type=text], input[type=number], select {
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  label.lbl { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  .col { display: flex; flex-direction: column; gap: 5px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* BUTTONS */
+  .btn {
+    padding: 7px 16px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+    white-space: nowrap;
+  }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn:not(:disabled):active { transform: scale(.97); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:not(:disabled):hover { background: #6aabff; }
+  .btn-danger  { background: var(--red);   color: #fff; }
+  .btn-danger:not(:disabled):hover  { background: #f87171; }
+  .btn-ghost   { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+  .btn-ghost:not(:disabled):hover   { color: var(--text); border-color: var(--text-muted); }
+
+  .btn-start {
+    width: 100%;
+    padding: 18px;
+    font-size: 20px;
+    font-weight: 700;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(135deg, #4f9cf9, #7b6bf3);
+    color: #fff;
+    cursor: pointer;
+    letter-spacing: .5px;
+    box-shadow: 0 4px 20px rgba(79,156,249,.3);
+    transition: opacity .15s, box-shadow .15s;
+  }
+  .btn-start:not(:disabled):hover { opacity: .92; box-shadow: 0 6px 28px rgba(79,156,249,.45); }
+  .btn-start:disabled { opacity: .35; cursor: not-allowed; box-shadow: none; }
+
+  /* TEMP PREVIEW */
+  .temp-preview {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    font-size: 12px;
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    color: var(--text-muted);
+  }
+  .temp-chip {
+    background: rgba(79,156,249,.15);
+    color: var(--accent);
+    border: 1px solid rgba(79,156,249,.3);
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* WIND SPEED CHIPS */
+  .wind-options { display: flex; gap: 8px; flex-wrap: wrap; }
+  .wind-chip {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    user-select: none;
+    font-size: 13px;
+  }
+  .wind-chip:has(input:checked) {
+    border-color: var(--accent);
+    background: rgba(79,156,249,.1);
+    color: var(--accent);
+  }
+  .wind-chip input { cursor: pointer; accent-color: var(--accent); }
+
+  /* ADVANCED TOGGLE */
+  .adv-toggle {
+    background: none; border: none;
+    color: var(--text-muted); font-size: 12px;
+    cursor: pointer; padding: 4px 0;
+    display: flex; align-items: center; gap: 5px;
+    font-family: inherit;
+  }
+  .adv-toggle:hover { color: var(--text); }
+  .adv-section { display: none; padding-top: 14px; border-top: 1px solid var(--border); margin-top: 12px; }
+  .adv-section.open { display: block; }
+
+  /* PROGRESS CARD */
+  .progress-card { display: none; }
+  .progress-card.active { display: block; }
+
+  /* LIVE STATS */
+  .live-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .live-stat {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .live-stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+  .live-stat-value {
+    font-size: 22px; font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .live-stat-value.hot  { color: #f97316; }
+  .live-stat-value.good { color: var(--green); }
+  .live-stat-unit { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+  /* PHASE */
+  .phase-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .phase-badge {
+    padding: 3px 12px; border-radius: 20px;
+    font-size: 12px; font-weight: 600;
+    background: var(--surface2); border: 1px solid var(--border);
+    transition: all .2s;
+  }
+  .phase-badge.heating  { background: rgba(249,115,22,.15); color: #f97316; border-color: #f97316; }
+  .phase-badge.soaking  { background: rgba(34,197,94,.15);  color: var(--green); border-color: var(--green); }
+  .phase-badge.settling { background: rgba(234,179,8,.15);  color: var(--yellow); border-color: var(--yellow); }
+  .phase-text { font-size: 13px; color: var(--text-muted); }
+
+  .overall-row {
+    font-size: 12px; color: var(--text-muted);
+    margin-bottom: 10px;
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+  .overall-row strong { color: var(--text); }
+
+  /* SOAK BAR */
+  .soak-bar-wrap {
+    background: var(--surface2);
+    border-radius: 6px;
+    height: 10px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+  }
+  .soak-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    border-radius: 6px;
+    width: 0%;
+    transition: width .9s linear;
+  }
+
+  /* CHART */
+  .chart-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .chart-label { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+  .chart-canvas-wrap { height: 280px; position: relative; }
+
+  .series-dd-wrap { position: relative; }
+  .series-dd-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: var(--radius);
+    padding: 5px 10px; font-size: 12px;
+    cursor: pointer; font-family: inherit;
+    white-space: nowrap;
+  }
+  .series-dd-btn:hover { border-color: var(--accent); }
+  .series-dd-panel {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px; z-index: 50;
+    min-width: 200px; box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  }
+  .series-dd-panel.open { display: block; }
+  .series-opt {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 6px; border-radius: 4px;
+    cursor: pointer; font-size: 12px; user-select: none;
+  }
+  .series-opt:hover { background: var(--surface2); }
+  .series-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* RESULTS TABLE */
+  .results-wrap { display: none; }
+  .results-wrap.visible { display: block; }
+  .results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .results-table th {
+    background: var(--surface2); color: var(--text-muted);
+    font-weight: 600; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .5px;
+    padding: 8px 10px; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .results-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+  .results-table td:not(:first-child) { text-align: right; }
+  .results-table tr:hover td { background: rgba(255,255,255,.02); }
+  .wind-group-row td {
+    background: rgba(79,156,249,.07) !important;
+    color: var(--accent); font-weight: 600; font-size: 12px;
+    border-top: 2px solid rgba(79,156,249,.25);
+    padding: 6px 10px;
+  }
+
+  /* COMPLETION */
+  .complete-banner { display: none; }
+  .complete-banner.visible {
+    display: block;
+    background: rgba(34,197,94,.08);
+    border: 1px solid var(--green);
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+  }
+  .complete-banner h3 { color: var(--green); font-size: 20px; margin-bottom: 8px; }
+  .complete-banner p  { color: var(--text-muted); font-size: 13px; margin-bottom: 16px; }
+
+  .err { color: var(--red); font-size: 12px; }
+  .divider { height: 1px; background: var(--border); margin: 14px 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-title">HeatsinkLab Wind Tunnel</span>
+  <span id="connPill" class="status-pill">Disconnected</span>
+  <div class="header-spacer"></div>
+  <a href="/advanced" class="adv-link">Advanced / Debug ↗</a>
+</div>
+
+<div class="main">
+
+  <!-- ══════════ STEP 1: CONNECT ══════════ -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step-badge" id="step1Badge">1</div>
+      <span class="card-title">Connect to Device</span>
+      <span class="card-subtitle" id="step1Sub"></span>
+    </div>
+    <div class="row">
+      <div class="col" style="flex:1;min-width:150px;">
+        <label class="lbl">Port</label>
+        <select id="portSel" style="width:100%;"></select>
+      </div>
+      <div class="col" style="padding-top:18px;">
+        <button class="btn btn-ghost" onclick="refreshPorts()" title="Refresh">⟳</button>
+      </div>
+      <div class="col" style="padding-top:18px;flex-direction:row;gap:6px;">
+        <button class="btn btn-primary" id="btnConnect" onclick="doConnect()">Connect</button>
+        <button class="btn btn-ghost"   id="btnDisconn" onclick="doDisconnect()" disabled>Disconnect</button>
+      </div>
+    </div>
+    <div id="connMsg" style="margin-top:10px;font-size:12px;color:var(--text-muted);min-height:18px;"></div>
+  </div>
+
+  <!-- ══════════ STEP 2: HEATSINK ID ══════════ -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step-badge" id="step2Badge">2</div>
+      <span class="card-title">Heatsink ID</span>
+    </div>
+    <div class="col">
+      <label class="lbl">Label for this heatsink (e.g. HS-01-fin-array)</label>
+      <input type="text" id="heatsinkId" placeholder="HS-01-fin-array" style="max-width:400px;"
+             oninput="onHsInput()">
+    </div>
+    <div id="hsErr" class="err" style="margin-top:6px;display:none;">Please enter a heatsink ID before starting.</div>
+  </div>
+
+  <!-- ══════════ STEP 3: TEST CONFIG ══════════ -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step-badge" id="step3Badge">3</div>
+      <span class="card-title">Test Configuration</span>
+    </div>
+
+    <!-- Temperature range -->
+    <div class="col" style="margin-bottom:16px;">
+      <label class="lbl">Temperature Range</label>
+      <div class="row" style="gap:14px;">
+        <div class="col">
+          <label class="lbl">Start (°C)</label>
+          <input type="number" id="tempStart" value="40" min="20" max="350" style="width:80px;" oninput="updateTempPreview()">
+        </div>
+        <div class="col">
+          <label class="lbl">Stop (°C)</label>
+          <input type="number" id="tempStop"  value="100" min="20" max="350" style="width:80px;" oninput="updateTempPreview()">
+        </div>
+        <div class="col">
+          <label class="lbl">Step (°C)</label>
+          <input type="number" id="tempStep"  value="10"  min="1"  max="100" style="width:80px;" oninput="updateTempPreview()">
+        </div>
+      </div>
+      <div class="temp-preview" id="tempPreview">–</div>
+    </div>
+
+    <!-- Wind speeds -->
+    <div class="col" style="margin-bottom:14px;">
+      <label class="lbl">Wind Speeds (Fan %)</label>
+      <div class="wind-options">
+        <label class="wind-chip"><input type="checkbox" value="0"   checked onchange="onWindChange()"> 0%</label>
+        <label class="wind-chip"><input type="checkbox" value="25"  checked onchange="onWindChange()"> 25%</label>
+        <label class="wind-chip"><input type="checkbox" value="50"  checked onchange="onWindChange()"> 50%</label>
+        <label class="wind-chip"><input type="checkbox" value="75"  checked onchange="onWindChange()"> 75%</label>
+        <label class="wind-chip"><input type="checkbox" value="100" checked onchange="onWindChange()"> 100%</label>
+      </div>
+    </div>
+
+    <!-- Advanced options -->
+    <button class="adv-toggle" id="advBtn" onclick="toggleAdv()">
+      <span id="advArrow">▶</span> Advanced options
+    </button>
+    <div class="adv-section" id="advSection">
+      <div class="row" style="gap:20px;flex-wrap:wrap;">
+        <div class="col">
+          <label class="lbl">Soak time (s)</label>
+          <input type="number" id="soakTime" value="60" min="5" max="600" style="width:90px;">
+        </div>
+        <div class="col">
+          <label class="lbl">Ambient temp (°C)</label>
+          <input type="number" id="ambientTemp" value="20" min="0" max="50" style="width:90px;">
+        </div>
+        <div class="col">
+          <label class="lbl">Fan settle time (s)</label>
+          <input type="number" id="settleTime" value="5" min="0" max="30" style="width:90px;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ START BUTTON ══════════ -->
+  <button class="btn-start" id="btnStart" onclick="startTest()" disabled>▶ &nbsp; START TEST</button>
+  <div id="startErr" class="err" style="text-align:center;display:none;"></div>
+
+  <!-- ══════════ PROGRESS ══════════ -->
+  <div class="card progress-card" id="progressCard">
+    <div class="card-header">
+      <span class="card-title">Test in Progress</span>
+      <div style="margin-left:auto;">
+        <button class="btn btn-danger" id="btnStop" onclick="stopTest()">■ &nbsp;Stop</button>
+      </div>
+    </div>
+
+    <div class="overall-row">
+      <span><strong id="ovWind">–</strong></span>
+      <span>Temp step <strong id="ovStep">–</strong></span>
+      <span>Wind speed group <strong id="ovGroup">–</strong></span>
+    </div>
+
+    <div class="phase-row">
+      <span class="phase-badge" id="phaseBadge">–</span>
+      <span class="phase-text"  id="phaseText">–</span>
+    </div>
+
+    <div class="soak-bar-wrap">
+      <div class="soak-bar" id="soakBar"></div>
+    </div>
+
+    <div class="live-grid">
+      <div class="live-stat">
+        <div class="live-stat-label">Temperature</div>
+        <div class="live-stat-value hot" id="lTemp">–</div>
+        <div class="live-stat-unit">°C</div>
+      </div>
+      <div class="live-stat">
+        <div class="live-stat-label">Setpoint</div>
+        <div class="live-stat-value" id="lSP">–</div>
+        <div class="live-stat-unit">°C</div>
+      </div>
+      <div class="live-stat">
+        <div class="live-stat-label">Power</div>
+        <div class="live-stat-value" id="lPower">–</div>
+        <div class="live-stat-unit">W</div>
+      </div>
+      <div class="live-stat">
+        <div class="live-stat-label">Eq. PWM</div>
+        <div class="live-stat-value" id="lEqPWM">–</div>
+        <div class="live-stat-unit">/255</div>
+      </div>
+      <div class="live-stat">
+        <div class="live-stat-label">R_th</div>
+        <div class="live-stat-value good" id="lRth">–</div>
+        <div class="live-stat-unit">°C/W</div>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-header">
+      <span class="chart-label">Live Data</span>
+      <div class="series-dd-wrap">
+        <button class="series-dd-btn" id="seriesDdBtn" onclick="toggleSeriesDd(event)">Series ▾</button>
+        <div class="series-dd-panel" id="seriesPanel"></div>
+      </div>
+      <label style="margin-left:auto;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:5px;cursor:pointer;">
+        <input type="checkbox" id="clearPerWind" checked> Clear chart per wind speed
+      </label>
+    </div>
+    <div class="chart-canvas-wrap">
+      <canvas id="studentChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ══════════ RESULTS TABLE ══════════ -->
+  <div class="card results-wrap" id="resultsCard">
+    <div class="card-header">
+      <span class="card-title">Results</span>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="downloadResultsCsv()">⬇ Results CSV</button>
+        <button class="btn btn-ghost" onclick="downloadRawCsv()">⬇ Raw CSV</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Fan %</th>
+            <th>SP (°C)</th>
+            <th>Actual (°C)</th>
+            <th>EqPWM</th>
+            <th>Power (W)</th>
+            <th>R_th (°C/W)</th>
+            <th>k (W/°C)</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════ COMPLETION ══════════ -->
+  <div class="complete-banner" id="completeBanner">
+    <h3>✓ Test Complete</h3>
+    <p>Results have been downloaded automatically. Replace the heatsink and start a new test.</p>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button class="btn btn-primary" onclick="newTest()">New Test</button>
+      <button class="btn btn-ghost"   onclick="downloadResultsCsv()">⬇ Download Results Again</button>
+    </div>
+  </div>
+
+</div><!-- /.main -->
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let ws = null, wsReconnTimer = null;
+let serialConnected = false, handshakeDone = false;
+let lastTelemetry = null;
+
+let testRunning  = false;
+let testResults  = [];
+let windSpeeds   = [];
+let testTemps    = [];
+let windIdx = 0, tempIdx = 0;
+let soakCountdown = 0, soakTotal = 0;
+let soakInterval = null, settleTimer = null;
+let soakTriggered = false;
+let lastEnterProg = 0;
+let testStartTs = null, chartSegTs = null;
+let chartMarkers = [];
+
+// ─── Chart setup ──────────────────────────────────────────────────────────────
+const SERIES = [
+  { key: 'smooth',     label: 'Temperature (°C)',  color: '#34d399', yAxis: 'y',  on: true  },
+  { key: 'sp',         label: 'Setpoint (°C)',      color: '#f97316', yAxis: 'y',  on: true  },
+  { key: 'power_w',    label: 'Power (W)',           color: '#fde047', yAxis: 'y2', on: false },
+  { key: 'eq_pwm',     label: 'Eq. PWM',             color: '#f43f5e', yAxis: 'y2', on: false },
+  { key: 'fan_speed',  label: 'Fan Speed (%)',        color: '#22d3ee', yAxis: 'y2', on: false },
+  { key: 'enter_prog', label: 'SMART Progress (%)',   color: '#a3e635', yAxis: 'y2', on: false },
+];
+
+const cDatasets = SERIES.map(s => ({
+  label: s.label,
+  data: [],
+  borderColor: s.color,
+  backgroundColor: s.color + '22',
+  borderWidth: 1.5,
+  pointRadius: 0,
+  yAxisID: s.yAxis,
+  hidden: !s.on,
+  tension: 0.15,
+  parsing: false,
+}));
+
+let sChart;
+
+Chart.register({
+  id: 'studentMarkers',
+  afterDraw(ch) {
+    const xA = ch.scales.x, yA = ch.scales.y;
+    if (!xA || !yA) return;
+    const ctx = ch.ctx;
+    chartMarkers.forEach(m => {
+      const x = xA.getPixelForValue(m.x);
+      if (x < xA.left || x > xA.right) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, yA.top);
+      ctx.lineTo(x, yA.bottom);
+      ctx.strokeStyle = 'rgba(255,255,255,.2)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255,255,255,.45)';
+      ctx.font = '10px Segoe UI,system-ui';
+      ctx.fillText(m.label, x + 4, yA.top + 12);
+      ctx.restore();
+    });
+  }
+});
+
+function initChart() {
+  const ctx = document.getElementById('studentChart').getContext('2d');
+  sChart = new Chart(ctx, {
+    type: 'line',
+    data: { datasets: cDatasets },
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1a1a1e',
+          borderColor: '#3a3a45',
+          borderWidth: 1,
+          titleColor: '#94a3b8',
+          bodyColor: '#e2e8f0',
+          callbacks: {
+            title: items => `t = ${items[0].parsed.x.toFixed(1)} s`,
+            label: item => ` ${item.dataset.label}: ${item.parsed.y !== undefined ? item.parsed.y.toFixed(2) : '–'}`,
+          }
+        },
+        studentMarkers: {}
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display: true, text: 'Time [s]', color: '#94a3b8' },
+          ticks: { color: '#94a3b8', maxTicksLimit: 8 },
+          grid: { color: '#2e2e36' },
+        },
+        y: {
+          position: 'left',
+          title: { display: true, text: 'Temperature [°C]', color: '#34d399' },
+          ticks: { color: '#34d399' },
+          grid: { color: '#2e2e36' },
+        },
+        y2: {
+          position: 'right',
+          title: { display: true, text: 'PWM / Other', color: '#94a3b8' },
+          ticks: { color: '#94a3b8' },
+          grid: { drawOnChartArea: false },
+          display: 'auto',
+        },
+      }
+    }
+  });
+}
+
+function buildSeriesPanel() {
+  const panel = document.getElementById('seriesPanel');
+  panel.innerHTML = '';
+  SERIES.forEach((s, i) => {
+    const lbl = document.createElement('label');
+    lbl.className = 'series-opt';
+    lbl.innerHTML = `
+      <input type="checkbox" ${s.on ? 'checked' : ''} onchange="toggleSeries(${i},this.checked)">
+      <span class="series-dot" style="background:${s.color}"></span>
+      ${s.label}
+    `;
+    panel.appendChild(lbl);
+  });
+}
+
+function toggleSeries(i, on) {
+  if (!sChart) return;
+  sChart.data.datasets[i].hidden = !on;
+  sChart.update('none');
+}
+
+function toggleSeriesDd(e) {
+  e.stopPropagation();
+  document.getElementById('seriesPanel').classList.toggle('open');
+}
+document.addEventListener('click', () => {
+  document.getElementById('seriesPanel').classList.remove('open');
+});
+
+function pushChartPoint(d) {
+  if (!sChart || !testRunning) return;
+  const base = chartSegTs || testStartTs || (Date.now() / 1000);
+  const t = d.ts - base;
+  const vals = {
+    smooth: d.smooth, sp: d.sp, power_w: d.power_w,
+    eq_pwm: d.eq_pwm, fan_speed: d.fan_speed, enter_prog: d.enter_prog
+  };
+  SERIES.forEach((s, i) => {
+    const v = vals[s.key];
+    if (v !== undefined && v !== null) {
+      cDatasets[i].data.push({ x: t, y: Number(v) });
+      if (cDatasets[i].data.length > 3000) cDatasets[i].data.shift();
+    }
+  });
+  sChart.update('none');
+}
+
+function clearChart() {
+  if (!sChart) return;
+  SERIES.forEach((_, i) => { cDatasets[i].data = []; });
+  chartMarkers = [];
+  sChart.update('none');
+}
+
+function addChartMarker(label) {
+  if (!chartSegTs && !testStartTs) return;
+  const base = chartSegTs || testStartTs;
+  const t = (Date.now() / 1000) - base;
+  chartMarkers.push({ x: t, label });
+}
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
+function connectWS() {
+  if (ws && ws.readyState <= 1) return;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen  = () => clearTimeout(wsReconnTimer);
+  ws.onerror = () => {};
+  ws.onclose = () => { wsReconnTimer = setTimeout(connectWS, 2000); };
+  ws.onmessage = evt => {
+    let msg; try { msg = JSON.parse(evt.data); } catch { return; }
+    handleMsg(msg);
+  };
+}
+
+function handleMsg(msg) {
+  if (msg.type === 'ping') return;
+
+  if (msg.type === 'status') {
+    if (msg.connected) onConnected(msg.port);
+    else onDisconnected();
+    return;
+  }
+  if (msg.type === 'connected')    { onConnected(msg.port); return; }
+  if (msg.type === 'disconnected') { onDisconnected(); return; }
+
+  if (msg.type === 'handshake_ok') {
+    handshakeDone = true;
+    setPill('connected', 'Connected · Device OK');
+    setConnMsg('Device verified — ready to test.', 'ok');
+    document.getElementById('step1Badge').className = 'step-badge done';
+    document.getElementById('step1Badge').textContent = '✓';
+    document.getElementById('step1Sub').textContent = 'Device ready';
+    updateStartBtn();
+    return;
+  }
+  if (msg.type === 'handshake_fail') {
+    setPill('warning', 'Wrong Port?');
+    setConnMsg('No HeatsinkLab telemetry detected. Try a different port.', 'err');
+    return;
+  }
+
+  if (msg.type === 'telemetry') {
+    lastTelemetry = msg;
+    if (testRunning) {
+      updateLiveStats(msg);
+      pushChartPoint(msg);
+      onTelemetry(msg);
+    }
+    return;
+  }
+}
+
+// ─── Connection ───────────────────────────────────────────────────────────────
+async function refreshPorts() {
+  const sel = document.getElementById('portSel');
+  sel.innerHTML = '<option>Loading…</option>';
+  try {
+    const r = await fetch('/api/ports');
+    const data = await r.json();
+    sel.innerHTML = '';
+    if (!data.ports.length) { sel.innerHTML = '<option value="">No ports found</option>'; return; }
+    data.ports.forEach(p => {
+      const o = document.createElement('option');
+      o.value = p.device;
+      o.textContent = p.device + (p.description && p.description !== p.device ? '  —  ' + p.description : '');
+      sel.appendChild(o);
+    });
+  } catch { sel.innerHTML = '<option value="">Error loading ports</option>'; }
+}
+
+async function doConnect() {
+  const port = document.getElementById('portSel').value;
+  if (!port) return;
+  document.getElementById('btnConnect').disabled = true;
+  handshakeDone = false;
+  setPill('warning', 'Connecting…');
+  setConnMsg('Connecting…');
+  try {
+    const r = await fetch('/api/connect', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ port, baud: 115200 })
+    });
+    const d = await r.json();
+    if (!d.ok) {
+      setConnMsg(d.msg || 'Connection failed.', 'err');
+      setPill('error', 'Failed');
+      document.getElementById('btnConnect').disabled = false;
+    }
+  } catch {
+    setConnMsg('Network error.', 'err');
+    document.getElementById('btnConnect').disabled = false;
+  }
+}
+
+async function doDisconnect() {
+  if (testRunning) await stopTest();
+  await fetch('/api/disconnect', { method: 'POST' }).catch(() => {});
+  onDisconnected();
+}
+
+function onConnected(port) {
+  serialConnected = true;
+  document.getElementById('btnConnect').disabled = true;
+  document.getElementById('btnDisconn').disabled = false;
+  setPill('connected', 'Connected · ' + port);
+  setConnMsg('Connected to ' + port + '. Waiting for device handshake…');
+}
+
+function onDisconnected() {
+  serialConnected = false;
+  handshakeDone = false;
+  document.getElementById('btnConnect').disabled = false;
+  document.getElementById('btnDisconn').disabled = true;
+  const b = document.getElementById('step1Badge');
+  b.className = 'step-badge'; b.textContent = '1';
+  document.getElementById('step1Sub').textContent = '';
+  setPill('', 'Disconnected');
+  setConnMsg('');
+  updateStartBtn();
+}
+
+function setPill(cls, text) {
+  const el = document.getElementById('connPill');
+  el.className = 'status-pill' + (cls ? ' ' + cls : '');
+  el.textContent = text;
+}
+
+function setConnMsg(text, type) {
+  const el = document.getElementById('connMsg');
+  el.textContent = text;
+  el.style.color = type === 'err' ? 'var(--red)' : type === 'ok' ? 'var(--green)' : 'var(--text-muted)';
+}
+
+// ─── Config helpers ───────────────────────────────────────────────────────────
+function updateTempPreview() {
+  const start = parseFloat(document.getElementById('tempStart').value);
+  const stop  = parseFloat(document.getElementById('tempStop').value);
+  const step  = parseFloat(document.getElementById('tempStep').value);
+  const el = document.getElementById('tempPreview');
+  el.innerHTML = '';
+  if (isNaN(start) || isNaN(stop) || isNaN(step) || step <= 0 || stop <= start) {
+    el.textContent = 'Invalid range.'; return;
+  }
+  const temps = [];
+  for (let t = start; t <= stop + 0.001; t += step) {
+    temps.push(Math.round(t * 10) / 10);
+    if (temps.length > 25) { el.textContent = 'Too many steps — reduce range or increase step.'; return; }
+  }
+  temps.forEach(t => {
+    const c = document.createElement('span'); c.className = 'temp-chip'; c.textContent = t + '°C';
+    el.appendChild(c);
+  });
+  const n = document.createElement('span');
+  n.style.color = 'var(--text-muted)';
+  n.textContent = ` (${temps.length} point${temps.length !== 1 ? 's' : ''})`;
+  el.appendChild(n);
+}
+
+function getTestTemps() {
+  const start = parseFloat(document.getElementById('tempStart').value);
+  const stop  = parseFloat(document.getElementById('tempStop').value);
+  const step  = parseFloat(document.getElementById('tempStep').value);
+  if (isNaN(start) || isNaN(stop) || isNaN(step) || step <= 0 || stop <= start) return null;
+  const arr = [];
+  for (let t = start; t <= stop + 0.001; t += step) {
+    arr.push(Math.round(t * 10) / 10);
+    if (arr.length > 25) return null;
+  }
+  return arr;
+}
+
+function getWindSpeeds() {
+  return [...document.querySelectorAll('.wind-options input:checked')].map(cb => parseFloat(cb.value));
+}
+
+function onWindChange() { updateStartBtn(); }
+function onHsInput() { document.getElementById('hsErr').style.display = 'none'; updateStartBtn(); }
+
+function updateStartBtn() {
+  const ok = serialConnected && handshakeDone && document.getElementById('heatsinkId').value.trim();
+  document.getElementById('btnStart').disabled = !ok;
+}
+
+function toggleAdv() {
+  const s = document.getElementById('advSection');
+  const open = s.classList.toggle('open');
+  document.getElementById('advArrow').textContent = open ? '▼' : '▶';
+}
+
+// ─── API helpers ──────────────────────────────────────────────────────────────
+async function cmd(c) {
+  return fetch('/api/command', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ command: c })
+  }).catch(() => {});
+}
+
+async function startCsv() {
+  const hsId = document.getElementById('heatsinkId').value.trim();
+  const runId = 'run_' + new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
+  await fetch('/api/csv/meta', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ run_id: runId, heatsink_id: hsId })
+  }).catch(() => {});
+  await fetch('/api/csv/start', { method: 'POST' }).catch(() => {});
+}
+
+async function stopCsv() {
+  await fetch('/api/csv/stop', { method: 'POST' }).catch(() => {});
+}
+
+async function sendAmbient() {
+  const v = parseFloat(document.getElementById('ambientTemp').value);
+  if (!isNaN(v)) await fetch('/api/ambient', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ ambient: v })
+  }).catch(() => {});
+}
+
+// ─── Test sequence ────────────────────────────────────────────────────────────
+async function startTest() {
+  const hsId = document.getElementById('heatsinkId').value.trim();
+  if (!hsId) { document.getElementById('hsErr').style.display = ''; return; }
+  testTemps = getTestTemps();
+  if (!testTemps) { showStartErr('Invalid temperature range.'); return; }
+  windSpeeds = getWindSpeeds();
+  if (!windSpeeds.length) { showStartErr('Select at least one wind speed.'); return; }
+  hideStartErr();
+
+  testResults = [];
+  windIdx = 0; tempIdx = 0;
+  testRunning = true;
+  testStartTs = Date.now() / 1000;
+  chartSegTs = testStartTs;
+  chartMarkers = [];
+
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('progressCard').classList.add('active');
+  document.getElementById('resultsCard').classList.add('visible');
+  document.getElementById('completeBanner').classList.remove('visible');
+  document.getElementById('resultsBody').innerHTML = '';
+  clearChart();
+
+  await startCsv();
+  await sendAmbient();
+  await cmd('SET MODE SMART');
+  await cmd('SET RUN ON');
+  startWindGroup();
+}
+
+function startWindGroup() {
+  if (!testRunning) return;
+  if (windIdx >= windSpeeds.length) { finishTest(); return; }
+
+  const fan = windSpeeds[windIdx];
+
+  if (document.getElementById('clearPerWind').checked) {
+    clearChart();
+    chartSegTs = Date.now() / 1000;
+  }
+  addChartMarker('Fan ' + fan + '%');
+  addGroupHeader(fan);
+
+  cmd('SET FAN ' + fan.toFixed(1));
+
+  const settle = parseInt(document.getElementById('settleTime').value) || 5;
+  setPhase('settling', `Fan set to ${fan}% — settling for ${settle}s…`);
+  setOverall(fan, '–', '–');
+
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => {
+    tempIdx = 0;
+    soakTriggered = false;
+    goToTemp();
+  }, settle * 1000);
+}
+
+function goToTemp() {
+  if (!testRunning) return;
+  if (tempIdx >= testTemps.length) { windIdx++; startWindGroup(); return; }
+
+  const sp = testTemps[tempIdx];
+  clearInterval(soakInterval);
+  soakCountdown = 0; soakTotal = 0;
+  soakTriggered = false;
+
+  setPhase('heating', `Heating to ${sp}°C…`);
+  setOverall(windSpeeds[windIdx], `${tempIdx + 1} / ${testTemps.length}`, `${windIdx + 1} of ${windSpeeds.length}`);
+  setSoakBar(0, 1);
+  cmd('SET SP ' + sp);
+}
+
+function onTelemetry(d) {
+  if (!testRunning) return;
+  const ep = d.enter_prog ?? 0;
+  lastEnterProg = ep;
+
+  if (ep >= 100 && !soakTriggered) {
+    soakTriggered = true;
+    soakTotal = parseInt(document.getElementById('soakTime').value) || 60;
+    soakCountdown = soakTotal;
+    setPhase('soaking', `Soaking… ${soakCountdown}s left`);
+    setSoakBar(0, soakTotal);
+
+    soakInterval = setInterval(() => {
+      if (!testRunning) { clearInterval(soakInterval); return; }
+      if (lastEnterProg < 100) {
+        clearInterval(soakInterval);
+        soakTriggered = false;
+        soakCountdown = 0;
+        setPhase('heating', 'HOLD lost — re-stabilising…');
+        setSoakBar(0, 1);
+        return;
+      }
+      soakCountdown--;
+      setPhase('soaking', `Soaking… ${soakCountdown}s left`);
+      setSoakBar(soakTotal - soakCountdown, soakTotal);
+      if (soakCountdown <= 0) {
+        clearInterval(soakInterval);
+        recordResult(d);
+      }
+    }, 1000);
+  }
+}
+
+function recordResult(d) {
+  const amb = parseFloat(document.getElementById('ambientTemp').value) || 20;
+  const dT  = (d.smooth ?? 0) - amb;
+  const r_th = (d.power_w > 0.05 && dT > 2) ? dT / d.power_w : null;
+  const k    = r_th != null ? 1.0 / r_th : null;
+  const row  = { fan: windSpeeds[windIdx], sp: testTemps[tempIdx], temp: d.smooth, eq_pwm: d.eq_pwm, power_w: d.power_w, r_th, k };
+  testResults.push(row);
+  addResultRow(row);
+  soakCountdown = 0;
+  tempIdx++;
+  soakTriggered = false;
+  goToTemp();
+}
+
+async function finishTest() {
+  testRunning = false;
+  clearInterval(soakInterval);
+  clearTimeout(settleTimer);
+
+  await cmd('SET RUN OFF');
+  await stopCsv();
+
+  setPhase('settling', '✓ All steps complete');
+  setSoakBar(1, 1);
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('completeBanner').classList.add('visible');
+  document.getElementById('completeBanner').scrollIntoView({ behavior: 'smooth' });
+  downloadResultsCsv();
+}
+
+async function stopTest() {
+  testRunning = false;
+  clearInterval(soakInterval);
+  clearTimeout(settleTimer);
+  await cmd('SET RUN OFF');
+  await stopCsv();
+  setPhase('settling', 'Test stopped — heater off.');
+  document.getElementById('btnStart').disabled = false;
+}
+
+function newTest() {
+  document.getElementById('completeBanner').classList.remove('visible');
+  document.getElementById('progressCard').classList.remove('active');
+  document.getElementById('resultsCard').classList.remove('visible');
+  document.getElementById('resultsBody').innerHTML = '';
+  clearChart();
+  updateStartBtn();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+function setPhase(phase, text) {
+  const b = document.getElementById('phaseBadge');
+  b.className = 'phase-badge ' + phase;
+  b.textContent = phase === 'heating' ? 'Heating' : phase === 'soaking' ? 'Soaking' : 'Settling';
+  document.getElementById('phaseText').textContent = text;
+}
+
+function setOverall(fan, step, group) {
+  document.getElementById('ovWind').textContent  = fan !== '–' ? `Fan: ${fan}%` : '–';
+  document.getElementById('ovStep').textContent  = step;
+  document.getElementById('ovGroup').textContent = group;
+}
+
+function setSoakBar(done, total) {
+  const pct = total > 0 ? Math.min(100, (done / total) * 100) : 0;
+  document.getElementById('soakBar').style.width = pct + '%';
+}
+
+function updateLiveStats(d) {
+  const f = (v, dec=1) => v != null ? Number(v).toFixed(dec) : '–';
+  document.getElementById('lTemp').textContent   = f(d.smooth);
+  document.getElementById('lSP').textContent     = f(d.sp);
+  document.getElementById('lPower').textContent  = f(d.power_w, 2);
+  document.getElementById('lEqPWM').textContent  = f(d.eq_pwm, 1);
+  const amb  = parseFloat(document.getElementById('ambientTemp').value) || 20;
+  const dT   = (d.smooth ?? 0) - amb;
+  const r_th = (d.power_w > 0.05 && dT > 2) ? dT / d.power_w : null;
+  document.getElementById('lRth').textContent = r_th != null ? r_th.toFixed(3) : '–';
+}
+
+function addGroupHeader(fan) {
+  const tr = document.createElement('tr');
+  tr.className = 'wind-group-row';
+  tr.innerHTML = `<td colspan="7">Wind speed: ${fan}% fan</td>`;
+  document.getElementById('resultsBody').appendChild(tr);
+}
+
+function addResultRow(r) {
+  const f = (v, d=2) => v != null ? Number(v).toFixed(d) : '–';
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${r.fan}%</td>
+    <td>${r.sp}</td>
+    <td>${f(r.temp)}</td>
+    <td>${f(r.eq_pwm, 1)}</td>
+    <td>${f(r.power_w, 3)}</td>
+    <td>${f(r.r_th, 3)}</td>
+    <td>${f(r.k, 3)}</td>
+  `;
+  document.getElementById('resultsBody').appendChild(tr);
+}
+
+function downloadResultsCsv() {
+  if (!testResults.length) { alert('No results yet.'); return; }
+  const hsId = document.getElementById('heatsinkId').value.trim() || 'heatsink';
+  const lines = ['Fan_pct,SP_degC,Temp_actual_degC,EqPWM,Power_W,R_th_degC_per_W,k_W_per_degC'];
+  testResults.forEach(r => {
+    const f = (v, d=4) => v != null ? Number(v).toFixed(d) : '';
+    lines.push([r.fan, r.sp, f(r.temp, 2), f(r.eq_pwm, 1), f(r.power_w, 3), f(r.r_th, 4), f(r.k, 4)].join(','));
+  });
+  triggerDownload(lines.join('\n'), hsId.replace(/[^a-z0-9_-]/gi, '_') + '_results_' + new Date().toISOString().slice(0, 10) + '.csv', 'text/csv');
+}
+
+async function downloadRawCsv() {
+  const r = await fetch('/api/csv/download').catch(() => null);
+  if (!r || !r.ok) { alert('No raw CSV available.'); return; }
+  const blob = await r.blob();
+  const hsId = document.getElementById('heatsinkId').value.trim() || 'heatsink';
+  triggerDownload(blob, hsId.replace(/[^a-z0-9_-]/gi, '_') + '_raw_' + new Date().toISOString().slice(0, 10) + '.csv');
+}
+
+function triggerDownload(data, filename, mime) {
+  const blob = data instanceof Blob ? data : new Blob([data], { type: mime || 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+function showStartErr(msg) {
+  const el = document.getElementById('startErr'); el.textContent = msg; el.style.display = '';
+}
+function hideStartErr() { document.getElementById('startErr').style.display = 'none'; }
+
+// ─── State persistence ────────────────────────────────────────────────────────
+async function loadState() {
+  try {
+    const r = await fetch('/api/state');
+    const s = await r.json();
+    if (s.st_hs_id)    document.getElementById('heatsinkId').value = s.st_hs_id;
+    if (s.st_t_start)  document.getElementById('tempStart').value  = s.st_t_start;
+    if (s.st_t_stop)   document.getElementById('tempStop').value   = s.st_t_stop;
+    if (s.st_t_step)   document.getElementById('tempStep').value   = s.st_t_step;
+    if (s.st_soak)     document.getElementById('soakTime').value   = s.st_soak;
+    if (s.st_ambient)  document.getElementById('ambientTemp').value = s.st_ambient;
+  } catch {}
+}
+
+function saveState() {
+  fetch('/api/state', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      st_hs_id:   document.getElementById('heatsinkId').value.trim(),
+      st_t_start: document.getElementById('tempStart').value,
+      st_t_stop:  document.getElementById('tempStop').value,
+      st_t_step:  document.getElementById('tempStep').value,
+      st_soak:    document.getElementById('soakTime').value,
+      st_ambient: document.getElementById('ambientTemp').value,
+    })
+  }).catch(() => {});
+}
+
+['heatsinkId','tempStart','tempStop','tempStep','soakTime','ambientTemp'].forEach(id => {
+  document.getElementById(id).addEventListener('change', saveState);
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+connectWS();
+refreshPorts();
+updateTempPreview();
+initChart();
+buildSeriesPanel();
+loadState().then(() => { updateTempPreview(); updateStartBtn(); });
+</script>
+</body>
+</html>
