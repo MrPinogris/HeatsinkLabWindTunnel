@@ -31,6 +31,7 @@ struct SystemState {
     float fanSpeedPercent;
     bool  fanPwmInverted;
     int   fanPwmApplied;   // actual raw PWM written to pin this tick
+    bool  fanPowerEnabled; // true = MOSFET gate HIGH (fan powered), false = gate LOW (fan fully off)
 
     // Control mode & enable
     ControlMode controlMode;

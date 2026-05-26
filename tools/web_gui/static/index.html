@@ -487,6 +487,14 @@
           <input type="checkbox" id="fanInv" onchange="setFanInv()" title="Invert fan PWM polarity — enable if fan runs backwards">
           <label for="fanInv" style="min-width:auto;cursor:pointer;" title="Invert fan PWM polarity — enable if fan runs backwards">Fan PWM Inverted</label>
         </div>
+        <!-- Fan Power MOSFET -->
+        <div class="row" style="margin-top:6px;" title="Cut fan power via MOSFET gate (GPIO 10) — true zero airflow when OFF">
+          <label style="min-width:auto;">Fan Power</label>
+          <div style="display:flex;gap:4px;margin-left:auto;">
+            <button class="small success" id="btnFanPwrOn" onclick="setFanPower(true)" title="Enable fan power (MOSFET gate HIGH)">ON</button>
+            <button class="small danger"  id="btnFanPwrOff" onclick="setFanPower(false)" title="Cut fan power (MOSFET gate LOW — true zero airflow)">OFF</button>
+          </div>
+        </div>
         <div class="flex-gap" style="margin-top:6px;">
           <button class="success small" onclick="sendCmd('SET RUN ON')" title="Enable the heater and control loop (SET RUN ON)">Start Heater</button>
           <button class="danger small" onclick="sendCmd('SET RUN OFF')" title="Disable the heater and control loop (SET RUN OFF)">Stop Heater</button>
@@ -526,6 +534,7 @@
           <div class="telem-item"><span class="telem-label">Abs Err °C</span><span class="telem-value warn" id="tAbsErr">-</span></div>
           <div class="telem-item"><span class="telem-label">Run State</span><span class="telem-value" id="tRun">-</span></div>
           <div class="telem-item" data-expert="true"><span class="telem-label">Fan Inv</span><span class="telem-value" id="tFanInv">-</span></div>
+          <div class="telem-item"><span class="telem-label">Fan Power</span><span class="telem-value" id="tFanPwr">-</span></div>
           <div class="telem-item" data-expert="true"><span class="telem-label">Eq PWM</span><span class="telem-value" id="tEqPWM">-</span></div>
           <div class="telem-item"><span class="telem-label">Power W</span><span class="telem-value" id="tPowerW">-</span></div>
           <div class="telem-item"><span class="telem-label">Humidity</span><span class="telem-value" id="tHumidity">-</span></div>
@@ -607,7 +616,19 @@
           <label style="min-width:100px;">Ambient (°C)</label>
           <input type="number" id="tAmbient" value="20" step="1" style="width:80px;" onchange="setAmbient(this.value)">
         </div>
-        <div class="row">
+        <!-- Fan Condition -->
+        <div class="row" style="margin-bottom:4px;">
+          <label style="min-width:100px;">Fan condition</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <label style="min-width:auto;cursor:pointer;display:flex;align-items:center;gap:3px;" title="Fan is powered on — use speed slider below">
+              <input type="radio" name="tFanCond" id="tFanCondOn" value="on" checked onchange="tFanCondChanged()"> Fan ON
+            </label>
+            <label style="min-width:auto;cursor:pointer;display:flex;align-items:center;gap:3px;" title="Fan power cut via MOSFET — true zero airflow regardless of speed">
+              <input type="radio" name="tFanCond" id="tFanCondOff" value="off" onchange="tFanCondChanged()"> Fan OFF
+            </label>
+          </div>
+        </div>
+        <div class="row" id="tFanSpeedRow">
           <label style="min-width:100px;">Fan speed (%)</label>
           <input type="range" id="tFanSlider" min="0" max="100" step="1" value="0" oninput="document.getElementById('tFanNum').value=this.value;" style="flex:1;">
           <input type="number" id="tFanNum" value="0" min="0" max="100" step="1" style="width:55px;" oninput="document.getElementById('tFanSlider').value=this.value;">
@@ -679,6 +700,7 @@
             <thead>
               <tr style="color:var(--text-muted);">
                 <th style="text-align:left;padding:3px 4px;border-bottom:1px solid var(--border);">SP</th>
+                <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--border);">Fan</th>
                 <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--border);">Temp</th>
                 <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--border);">Amb</th>
                 <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--border);">EqPWM</th>
@@ -1289,6 +1311,8 @@ function updateTelemetry(d) {
   document.getElementById('tAbsErr').textContent = fmt(d.abs_err);
   document.getElementById('tRun').textContent = d.run_state || '-';
   document.getElementById('tFanInv').textContent = d.fan_inv === '1' ? 'Yes' : 'No';
+  document.getElementById('tFanPwr').textContent = d.fan_power || '-';
+  if (d.fan_power) updateFanPwrButtons(d.fan_power);
   document.getElementById('tEqPWM').textContent = fmt(d.eq_pwm, 1);
   document.getElementById('tPowerW').textContent = fmt(d.power_w, 3) + ' W';
   document.getElementById('tHumidity').textContent = d.humidity_pct != null ? fmt(d.humidity_pct, 1) + ' %' : '-';
@@ -1347,6 +1371,7 @@ function applyCfg(c) {
   set('pMAXSTEP', c.maxstep); set('pENTERCNT', c.entercnt); set('pEXITCNT', c.exitcnt);
   set('pFAN', c.fan); set('pMANPWM', c.manpwm);
   if (c.fan_inv !== undefined) document.getElementById('fanInv').checked = c.fan_inv === '1';
+  if (c.fan_power) updateFanPwrButtons(c.fan_power);
   if (c.ctrl_mode) setModeUI(c.ctrl_mode);
   // Sync sliders
   ['SPBIAS','SP','ALPHA','MAXSTEP','ENTERCNT','EXITCNT','FAN','MANPWM'].forEach(syncSlider);
@@ -1473,6 +1498,18 @@ function setModeUI(mode) {
 function setFanInv() {
   const val = document.getElementById('fanInv').checked ? '1' : '0';
   sendCmd('SET FANINV ' + val);
+}
+
+function setFanPower(on) {
+  sendCmd('SET FANPWR ' + (on ? 'ON' : 'OFF'));
+}
+
+function updateFanPwrButtons(state) {
+  const on  = document.getElementById('btnFanPwrOn');
+  const off = document.getElementById('btnFanPwrOff');
+  if (!on || !off) return;
+  on.style.opacity  = state === 'ON'  ? '1' : '0.45';
+  off.style.opacity = state === 'OFF' ? '1' : '0.45';
 }
 
 function applyAll() {
@@ -2123,6 +2160,12 @@ function setTesterFan() {
   sendCmd('SET FAN ' + pct.toFixed(1));
 }
 
+function tFanCondChanged() {
+  const fanOff = document.getElementById('tFanCondOff').checked;
+  document.getElementById('tFanSpeedRow').style.opacity = fanOff ? '0.4' : '1';
+  document.getElementById('tFanSpeedRow').style.pointerEvents = fanOff ? 'none' : '';
+}
+
 async function startTest() {
   if (!serialConnected) { alert('Not connected.'); return; }
   if (testTemps.length === 0) { alert('Add at least one test temperature.'); return; }
@@ -2134,9 +2177,17 @@ async function startTest() {
   document.getElementById('testerLive').style.display = '';
   document.getElementById('testerResults').style.display = '';
   document.getElementById('tResultsBody').innerHTML = '';
-  appendLog('[TESTER] Starting test sequence: ' + testTemps.join('°, ') + '°C', 'info');
+  const fanOff = document.getElementById('tFanCondOff').checked;
+  const fanLabel = fanOff ? 'Fan OFF' : 'Fan ON';
+  appendLog('[TESTER] Starting test sequence: ' + testTemps.join('°, ') + '°C | Condition: ' + fanLabel, 'info');
   await startCsv();
   sendCmd('SET MODE SMART');
+  if (fanOff) {
+    sendCmd('SET FANPWR OFF');
+  } else {
+    sendCmd('SET FANPWR ON');
+    setTesterFan();
+  }
   sendCmd('SET RUN ON');
   goToStep(0);
 }
@@ -2198,8 +2249,10 @@ function testerOnTelemetry(d) {
 
 function recordResult(d, amb, r_th) {
   const k = r_th != null ? (1.0 / r_th) : null;
+  const fanOff = document.getElementById('tFanCondOff').checked;
   const result = {
     sp: testTemps[testStepIdx],
+    fan_cond: fanOff ? 'OFF' : 'ON',
     temp: d.smooth,
     ambient: amb,
     eq_pwm: d.eq_pwm,
@@ -2217,9 +2270,11 @@ function recordResult(d, amb, r_th) {
 
 function addResultRow(r) {
   const fmt = (v, d=2) => v != null ? Number(v).toFixed(d) : '-';
+  const fanColor = r.fan_cond === 'OFF' ? 'color:var(--text-muted);' : '';
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td style="padding:3px 4px;border-bottom:1px solid var(--border);">${r.sp}°</td>
+    <td style="padding:3px 4px;border-bottom:1px solid var(--border);text-align:right;${fanColor}">${r.fan_cond || '-'}</td>
     <td style="padding:3px 4px;border-bottom:1px solid var(--border);text-align:right;">${fmt(r.temp)}</td>
     <td style="padding:3px 4px;border-bottom:1px solid var(--border);text-align:right;">${fmt(r.ambient,1)}</td>
     <td style="padding:3px 4px;border-bottom:1px solid var(--border);text-align:right;">${fmt(r.eq_pwm,1)}</td>
@@ -2236,6 +2291,8 @@ async function finishTest() {
   document.getElementById('btnTestStop').disabled = true;
   document.getElementById('tLiveStatus').textContent = '✓ Test complete!';
   appendLog('[TESTER] Test complete. ' + testResults.length + ' steps recorded.', 'info');
+  sendCmd('SET RUN OFF');
+  sendCmd('SET FANPWR ON');  // always restore fan power after test
   await stopCsv();
 }
 
@@ -2247,15 +2304,17 @@ function stopTest() {
   document.getElementById('btnTestStop').disabled = true;
   document.getElementById('tLiveStatus').textContent = 'Stopped.';
   appendLog('[TESTER] Test stopped.', 'warn');
+  sendCmd('SET RUN OFF');
+  sendCmd('SET FANPWR ON');  // always restore fan power on stop
   stopCsv();
 }
 
 function downloadResultsCsv() {
   if (testResults.length === 0) { alert('No results yet.'); return; }
-  const lines = ['SP_degC,Temp_actual,Ambient_degC,EqPWM,Power_W,R_th,k,Humidity_pct'];
+  const lines = ['SP_degC,Fan_condition,Temp_actual,Ambient_degC,EqPWM,Power_W,R_th,k,Humidity_pct'];
   testResults.forEach(r => {
     const fmt = (v, d=3) => v != null ? Number(v).toFixed(d) : '';
-    lines.push([r.sp, fmt(r.temp), fmt(r.ambient,1), fmt(r.eq_pwm,1), fmt(r.power_w,3), fmt(r.r_th,4), fmt(r.k,4), fmt(r.humidity_pct,1)].join(','));
+    lines.push([r.sp, r.fan_cond||'ON', fmt(r.temp), fmt(r.ambient,1), fmt(r.eq_pwm,1), fmt(r.power_w,3), fmt(r.r_th,4), fmt(r.k,4), fmt(r.humidity_pct,1)].join(','));
   });
   const blob = new Blob([lines.join('\n')], {type:'text/csv'});
   const a = document.createElement('a');
