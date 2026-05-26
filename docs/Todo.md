@@ -1,45 +1,97 @@
 # Todo
-### Hardware
-- [ ] **documentation** make a list of all the hardware components needed for the project
-- [ ] **Architecture** all sensors should be easily implementable to microcontroller and, the String output should be automatically updated in the microcontroller when new sensors are added to the system
-    - [ ] **implementation** implement all hardware components and test them individually
-        - [ ] **implementation** of humidity sensor
-            - [ ] implement 1 sensor and test it
-            - [ ] make it expandable for more sensors in the future
-        - [ ] **implementation** of temperature sensor 
-            - [x] implement 1 sensor and test it
-            - [ ] make it expandable for more sensors in the future
-        - [ ] **implementation** of pressure sensor
-            - [ ] implement 1 sensor and test it
-            - [ ] make it expandable for more sensors in the future
-        - [ ] **implementation** of airflow sensor
-            - [ ] implement 1 sensor and test it
-            - [ ] make it expandable for more sensors in the future
-- [x] **Architecture** the string output of the microcontroller should be able to be read by the server on the computer even when there's new sensors added to the system
-    - [x] implement a way to read the string output of the microcontroller on the server
-    - [x] make sure that the string output is updated automatically when new sensors are added to the system
-- [ ] **Sensor Refactoring** test the Power measture senor more deeople because it can have possible power losses and it can be a problem for the system if this is true
-    - [ ] **Hardware Refactoring** if there are power losses, find a way to fix it and make sure that the system is stable and reliable or find a different sensor that can be used for power measurement
 
-### PCB
-- [ ] **Design** PCB
-    - [ ] **architecture** make a PCB design that can accommodate all the hardware components and make it easy to connect them together
-    - [ ] **architecture** make sure that the PCB design has extra connectors for future expansion of the system and additional sensors -> this feeds back to software architecture and hardware architecture because the software should be able to handle new sensors and the hardware should be able to accommodate them and a possible way to configure the sensor connections in software and hardware should be implemented
-        - [ ] **todo** define a standard expansion connector type and pinout (power, ground, data lines)
-        - [ ] **todo** reserve at least 2 spare expansion headers for future sensors
-        - [ ] **todo** document connector electrical limits (voltage, current, max sensor load)
-        - [ ] **todo** create a sensor slot map (I2C, SPI, analog, UART) with conflict rules
-        - [ ] **todo** add jumper or DIP options for configurable sensor addressing where needed
-        - [ ] **todo** add test points for power rails and sensor data lines
-        - [ ] **todo** define a software sensor-configuration table format (sensor type, bus, address, label)
-        - [ ] **todo** implement backend parsing rules so new sensor fields can be added without breaking telemetry
-        - [ ] **todo** add a validation checklist for adding a new sensor (hardware wiring + backend + frontend + CSV schema)
-        - [ ] **todo** verify the full expansion flow with one mock future sensor before PCB release
-    - [ ] **implementation** implement the PCB design and test it with the hardware components to make sure that everything is working properly and there are no issues with the connections or power supply
-### Software
-#### ESP32 ./src/
-- [x] **Refactoring** put the part of the code that handels the Serial communication in a separate file and make it a function that can be called in the main loop and more readable
-- [x] **Refactoring** put the part of the code that handels the sensors in a separate file and make it a function that can be called in the main loop and more readable
-- [x] **Refactoring** make the code more modular and easier to read by using functions and classes
-#### Server ./tools/web_gui/
-- [ ] **feature** 
+## Hardware
+
+- [ ] **Documentation** — complete hardware component list and datasheets
+- [ ] **Architecture** — all sensors should be easily implementable; string output updated automatically when new sensors are added
+    - [ ] **Implementation** of humidity sensor
+        - [x] EZO-HUM I²C probe implemented and tested
+        - [ ] Make expandable for additional humidity sensors
+    - [x] **Implementation** of temperature sensor
+        - [x] MAX6675 K-type thermocouple implemented and tested
+        - [ ] Make expandable (inlet/outlet air temp sensors)
+    - [x] **Implementation** of pressure sensor
+        - [x] Sensirion SDP510 differential pressure implemented (replaced SDP2000-L analog)
+        - [ ] Second pressure channel pending hardware
+    - [ ] **Implementation** of airflow / anemometer sensor
+        - [ ] Select sensor (hot-wire, Pitot, or ultrasonic)
+        - [ ] Implement and test
+- [x] **Architecture** — firmware telemetry string is read by server.py even as new sensors are added
+    - [x] ExtSensorRegistry provides named slots — backend TELEM_RE regex accepts new named fields
+- [ ] **Sensor validation** — test INA226 power measurement accuracy under load; investigate possible power losses through MOSFET resistance
+
+## PCB
+
+- [ ] **Design** PCB to replace dev-board wiring
+    - [ ] Define standard expansion connector type and pinout (power, GND, data lines)
+    - [ ] Reserve at least 2 spare expansion headers for future sensors
+    - [ ] Document connector electrical limits (voltage, current, max sensor load)
+    - [ ] Create sensor slot map (I²C, SPI, analog, UART) with address-conflict rules
+    - [ ] Add jumper / DIP options for configurable I²C addressing
+    - [ ] Add test points for power rails and sensor data lines
+    - [ ] Define software sensor-configuration table format (type, bus, address, label)
+    - [ ] Validate full expansion flow with one mock sensor before PCB release
+    - [ ] Implement PCB and verify all connections
+
+## Software — Firmware (`src/`)
+
+- [x] Refactor serial communication into SerialProtocol.cpp
+- [x] Refactor sensor reads into SensorManager.cpp
+- [x] Modular architecture with classes (PIDController, SensorManager, ExtSensorRegistry)
+- [x] SMART mode: PID until stable, then lock equilibrium PWM
+- [x] SMART HOLD: fix stuck-on-SP-change bug
+- [x] INA226 power monitoring integrated into telemetry
+- [x] SDP510 differential pressure integrated into telemetry
+- [x] EZO-HUM humidity probe integrated into telemetry
+- [x] Fan power MOSFET (GPIO 10) for complete fan cut-off
+- [x] FANPWR serial command (`SET FANPWR ON/OFF`)
+- [x] Thermocouple fault detection → immediate heater cut
+- [x] Stuck-sensor watchdog → heater cut
+
+## Software — Backend (`tools/web_gui/server.py`)
+
+- [x] FastAPI + WebSocket server on port 8765
+- [x] TELEM_RE regex parses all telemetry fields including sensors
+- [x] CSV logger with schema_version header (current: v4)
+- [x] Humidity and pressure fields in CSV_FIELDS
+- [x] Pressure zero / tare endpoint (`/api/pressure_tare`)
+- [x] Ambient temperature endpoint (`/api/ambient`)
+- [x] Virtual MCU simulator (VIRTUAL port)
+- [x] Fan power state tracked in VirtualMCU
+- [x] Run ID and Heatsink ID in CSV header metadata
+- [ ] Post-test auto shutdown (`SET RUN OFF` on test completion) — **P0 safety item**
+- [ ] Guided connection wizard with handshake progress indicator
+- [ ] Startup sensor health check (INA226 + thermocouple validation)
+
+## Software — Frontend (`tools/web_gui/static/index.html`)
+
+- [x] Real-time Chart.js dual-axis graph (temperature + PWM)
+- [x] PID parameter tuning sliders
+- [x] AUTO / MANUAL / SMART mode selection
+- [x] INA226 current, voltage, power readout
+- [x] Tester mode with automated temperature stepping (SMART mode)
+- [x] Tester: Fan ON / Fan OFF condition selector (uses GPIO 10 MOSFET)
+- [x] Tester: per-temperature fan and condition recorded in Results CSV
+- [x] Tester: ambient temperature auto-fill from main panel
+- [x] Tester: humidity_pct column in Results CSV
+- [x] Results table with EqPWM, Power_W, R_th, k per step
+- [x] Expert / Student mode toggle
+- [x] Performance metrics (rise time, settle time, overshoot, IAE)
+- [x] Graph cursor / crosshair probe tool
+- [x] CSV column customisation dialog with Power Query formula
+- [x] Phase markers (📌 Marker button → chart + CSV annotation)
+- [x] Presets (save / load / delete named configurations)
+- [x] Pressure sensor tare / reset zero UI
+- [x] Run ID and Heatsink ID fields (mirrored between Normal and Tester panels)
+- [ ] Temperature range / batch entry (start, stop, step → generate list) — **P1**
+- [ ] Auto result download on test completion — **P1**
+- [ ] Safety layer: persistent SAFE / RUNNING / FAULT status indicator — **P0**
+- [ ] Post-test auto shutdown UI confirmation — **P0**
+- [ ] Guided connection wizard — **P1**
+- [ ] Startup sensor health check display — **P1**
+
+## Release / Deployment
+
+- [ ] Dual-file release build: GUI installer (.bat / .exe) + pre-compiled firmware binary (.bin)
+- [ ] Version number in GUI footer and firmware CFG output for mismatch detection
+- [ ] Lab technician setup guide (no dev tools required)
