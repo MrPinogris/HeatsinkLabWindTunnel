@@ -23,3 +23,14 @@ __pycache__/
 
 # Claude Code internal scaffolding
 .claude/
+
+# Secrets / environment files — never commit
+.env
+.env.*
+*.env
+
+# Runtime-generated: user presets (written by server.py)
+tools/web_gui/presets.json
+
+# Generated build artefacts
+docs/wiring_schematic.docx
