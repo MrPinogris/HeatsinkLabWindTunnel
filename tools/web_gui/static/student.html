@@ -432,6 +432,7 @@
     <div class="col" style="margin-bottom:14px;">
       <label class="lbl">Wind Speeds (Fan %)</label>
       <div class="wind-options">
+        <label class="wind-chip" title="Cut fan power via MOSFET — true zero airflow"><input type="checkbox" value="-1"  onchange="onWindChange()"> Fan OFF</label>
         <label class="wind-chip"><input type="checkbox" value="0"   checked onchange="onWindChange()"> 0%</label>
         <label class="wind-chip"><input type="checkbox" value="25"  checked onchange="onWindChange()"> 25%</label>
         <label class="wind-chip"><input type="checkbox" value="50"  checked onchange="onWindChange()"> 50%</label>
@@ -451,8 +452,8 @@
           <input type="number" id="soakTime" value="60" min="5" max="600" style="width:90px;">
         </div>
         <div class="col">
-          <label class="lbl">Ambient temp (°C)</label>
-          <input type="number" id="ambientTemp" value="20" min="0" max="50" style="width:90px;">
+          <label class="lbl">Ambient temp (°C) <span id="ambientSrc" style="font-weight:400;color:var(--text-muted);">(manual)</span></label>
+          <input type="number" id="ambientTemp" value="20" min="0" max="50" style="width:90px;" title="Auto-filled from humidity sensor temperature when connected">
         </div>
         <div class="col">
           <label class="lbl">Fan settle time (s)</label>
@@ -796,6 +797,12 @@ function handleMsg(msg) {
 
   if (msg.type === 'telemetry') {
     lastTelemetry = msg;
+    if (msg.hum_temp_c != null) {
+      document.getElementById('ambientTemp').value = Number(msg.hum_temp_c).toFixed(1);
+      const src = document.getElementById('ambientSrc');
+      src.textContent = '(from sensor)';
+      src.style.color = 'var(--green)';
+    }
     if (testRunning) {
       updateLiveStats(msg);
       pushChartPoint(msg);
@@ -1000,27 +1007,45 @@ async function startTest() {
   await startCsv();
   await sendAmbient();
   await cmd('SET MODE SMART');
+  // Apply fan power state BEFORE enabling the control loop
+  const firstFan = windSpeeds[0];
+  if (firstFan < 0) {
+    await cmd('SET FANPWR OFF');
+  } else {
+    await cmd('SET FANPWR ON');
+    await cmd('SET FAN ' + firstFan.toFixed(1));
+  }
   await cmd('SET RUN ON');
   startWindGroup();
 }
 
-function startWindGroup() {
+function fanLabel(fan) {
+  return fan < 0 ? 'Fan OFF' : fan + '%';
+}
+
+async function startWindGroup() {
   if (!testRunning) return;
   if (windIdx >= windSpeeds.length) { finishTest(); return; }
 
   const fan = windSpeeds[windIdx];
+  const fanOff = fan < 0;
 
   if (document.getElementById('clearPerWind').checked) {
     clearChart();
     chartSegTs = Date.now() / 1000;
   }
-  addChartMarker('Fan ' + fan + '%');
+  addChartMarker(fanLabel(fan));
   addGroupHeader(fan);
 
-  cmd('SET FAN ' + fan.toFixed(1));
+  if (fanOff) {
+    await cmd('SET FANPWR OFF');
+  } else {
+    await cmd('SET FANPWR ON');
+    await cmd('SET FAN ' + fan.toFixed(1));
+  }
 
   const settle = parseInt(document.getElementById('settleTime').value) || 5;
-  setPhase('settling', `Fan set to ${fan}% — settling for ${settle}s…`);
+  setPhase('settling', `${fanLabel(fan)} — settling for ${settle}s…`);
   setOverall(fan, '–', '–');
 
   clearTimeout(settleTimer);
@@ -1031,9 +1056,9 @@ function startWindGroup() {
   }, settle * 1000);
 }
 
-function goToTemp() {
+async function goToTemp() {
   if (!testRunning) return;
-  if (tempIdx >= testTemps.length) { windIdx++; startWindGroup(); return; }
+  if (tempIdx >= testTemps.length) { windIdx++; await startWindGroup(); return; }
 
   const sp = testTemps[tempIdx];
   clearInterval(soakInterval);
@@ -1099,6 +1124,7 @@ async function finishTest() {
   clearTimeout(settleTimer);
 
   await cmd('SET RUN OFF');
+  await cmd('SET FANPWR ON');
   await stopCsv();
 
   setPhase('settling', '✓ All steps complete');
@@ -1114,6 +1140,7 @@ async function stopTest() {
   clearInterval(soakInterval);
   clearTimeout(settleTimer);
   await cmd('SET RUN OFF');
+  await cmd('SET FANPWR ON');
   await stopCsv();
   setPhase('settling', 'Test stopped — heater off.');
   document.getElementById('btnStart').disabled = false;
@@ -1138,7 +1165,7 @@ function setPhase(phase, text) {
 }
 
 function setOverall(fan, step, group) {
-  document.getElementById('ovWind').textContent  = fan !== '–' ? `Fan: ${fan}%` : '–';
+  document.getElementById('ovWind').textContent  = fan !== '–' ? `Fan: ${fanLabel(fan)}` : '–';
   document.getElementById('ovStep').textContent  = step;
   document.getElementById('ovGroup').textContent = group;
 }
@@ -1163,7 +1190,7 @@ function updateLiveStats(d) {
 function addGroupHeader(fan) {
   const tr = document.createElement('tr');
   tr.className = 'wind-group-row';
-  tr.innerHTML = `<td colspan="7">Wind speed: ${fan}% fan</td>`;
+  tr.innerHTML = `<td colspan="7">Wind speed: ${fan < 0 ? 'Fan OFF (MOSFET — zero airflow)' : fan + '% fan'}</td>`;
   document.getElementById('resultsBody').appendChild(tr);
 }
 
@@ -1171,7 +1198,7 @@ function addResultRow(r) {
   const f = (v, d=2) => v != null ? Number(v).toFixed(d) : '–';
   const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td>${r.fan}%</td>
+    <td>${r.fan < 0 ? 'OFF' : r.fan + '%'}</td>
     <td>${r.sp}</td>
     <td>${f(r.temp)}</td>
     <td>${f(r.eq_pwm, 1)}</td>
@@ -1185,10 +1212,11 @@ function addResultRow(r) {
 function downloadResultsCsv() {
   if (!testResults.length) { alert('No results yet.'); return; }
   const hsId = document.getElementById('heatsinkId').value.trim() || 'heatsink';
-  const lines = ['Fan_pct,SP_degC,Temp_actual_degC,EqPWM,Power_W,R_th_degC_per_W,k_W_per_degC'];
+  const lines = ['Fan_condition,SP_degC,Temp_actual_degC,EqPWM,Power_W,R_th_degC_per_W,k_W_per_degC'];
   testResults.forEach(r => {
     const f = (v, d=4) => v != null ? Number(v).toFixed(d) : '';
-    lines.push([r.fan, r.sp, f(r.temp, 2), f(r.eq_pwm, 1), f(r.power_w, 3), f(r.r_th, 4), f(r.k, 4)].join(','));
+    const fanCol = r.fan < 0 ? 'OFF' : r.fan + '%';
+    lines.push([fanCol, r.sp, f(r.temp, 2), f(r.eq_pwm, 1), f(r.power_w, 3), f(r.r_th, 4), f(r.k, 4)].join(','));
   });
   triggerDownload(lines.join('\n'), hsId.replace(/[^a-z0-9_-]/gi, '_') + '_results_' + new Date().toISOString().slice(0, 10) + '.csv', 'text/csv');
 }

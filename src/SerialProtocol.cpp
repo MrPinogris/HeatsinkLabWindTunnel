@@ -12,6 +12,7 @@ extern PIDController pid;
 
 // Actuator helpers defined in main.cpp
 extern void setFanSpeedPercent(float percent);
+extern void applyFanPower();
 extern void applyPidTunings();
 extern void resetSmartState();
 
@@ -56,6 +57,7 @@ void SerialProtocol::loadConfig() {
     sys.smartExitCount  = (uint16_t)constrain(prefs.getInt("extcnt", sys.smartExitCount),  1, 400);
     sys.fanSpeedPercent = constrain(prefs.getFloat("fanpct", sys.fanSpeedPercent), 0.0f, 100.0f);
     sys.fanPwmInverted  = prefs.getBool("faninv", sys.fanPwmInverted);
+    sys.fanPowerEnabled = prefs.getBool("fanpwr", sys.fanPowerEnabled);
 
     if (prefs.isKey("mode")) {
         int modeRaw = prefs.getInt("mode", (int)MODE_AUTO);
@@ -87,6 +89,7 @@ void SerialProtocol::saveConfig() {
     prefs.putInt  ("extcnt",  sys.smartExitCount);
     prefs.putFloat("fanpct",  sys.fanSpeedPercent);
     prefs.putBool ("faninv",  sys.fanPwmInverted);
+    prefs.putBool ("fanpwr",  sys.fanPowerEnabled);
     prefs.putInt  ("mode",    (int)sys.controlMode);
     prefs.putFloat("manpwmf", sys.manualPwmTarget);
     // Backward-compat keys
@@ -102,12 +105,13 @@ void SerialProtocol::printConfig() {
     Serial.printf(
         "CFG KP: %.3f | KI: %.3f | KD: %.3f | BIAS: %.2f | SPBIAS: %.2f | SP: %.2f"
         " | ALPHA: %.3f | MAXSTEP: %d | ENTCNT: %d | EXTCNT: %d | FAN: %.1f"
-        " | FANINV: %d | MODE: %s | MANPWM: %.2f | RUN: %s\n",
+        " | FANINV: %d | MODE: %s | MANPWM: %.2f | RUN: %s | FANPWR: %s\n",
         kp, ki, kd, pid.getBias(), sys.setpointBias, sys.setpoint,
         sys.emaAlpha, sys.maxPwmStep, sys.smartEnterCount, sys.smartExitCount,
         sys.fanSpeedPercent, sys.fanPwmInverted ? 1 : 0,
         modeToText(sys.controlMode), sys.manualPwmTarget,
-        sys.controlEnabled ? "ON" : "OFF");
+        sys.controlEnabled ? "ON" : "OFF",
+        sys.fanPowerEnabled ? "ON" : "OFF");
 }
 
 // ── emitTelemetry ─────────────────────────────────────────────────────────────
@@ -128,7 +132,7 @@ void SerialProtocol::emitTelemetry(const CoreSensorData &s,
         " | FAN: %.1f | FANPWM: %d | MODE: %s | STATE: %s"
         " | MANPWM: %.2f | HOLDPWM: %.2f | ENTPROG: %.1f | EXTPROG: %.1f"
         " | EABS: %.2f | RUN: %s | FANINV: %d"
-        " | V: %.3f V | I: %.4f A | W: %.3f W | EQPWM: %.1f",
+        " | V: %.3f V | I: %.4f A | W: %.3f W | EQPWM: %.1f | FANPWR: %s",
         s.rawTemp, s.filteredTemp, s.smoothTemp, pwm,
         pTerm, iTerm, dTerm, pidOut,
         sys.pidBias, sys.setpointBias, sys.setpoint, effectiveSetpoint,
@@ -138,7 +142,8 @@ void SerialProtocol::emitTelemetry(const CoreSensorData &s,
         sys.smartEnterProgressPct, sys.smartExitProgressPct,
         absError,
         sys.controlEnabled ? "ON" : "OFF", sys.fanPwmInverted ? 1 : 0,
-        s.inaVoltage, s.inaCurrent, s.inaPower, sys.eqPwm);
+        s.inaVoltage, s.inaCurrent, s.inaPower, sys.eqPwm,
+        sys.fanPowerEnabled ? "ON" : "OFF");
 
     // Append any registered extension sensors (airspeed, pressure, humidity…)
     extSensors.emitAll();
@@ -159,14 +164,14 @@ static void handleCommand(char *line) {
 
     char *command = strtok(line, " \t");
     if (!command || strcmp(command, "SET") != 0) {
-        Serial.println("ERR Unknown command. Use SET <KP|KI|KD|BIAS|SPBIAS|SP|ALPHA|MAXSTEP|ENTERCNT|EXITCNT|FAN|FANINV|MODE|MANPWM|RUN> <value> or GET");
+        Serial.println("ERR Unknown command. Use SET <KP|KI|KD|BIAS|SPBIAS|SP|ALPHA|MAXSTEP|ENTERCNT|EXITCNT|FAN|FANINV|FANPWR|MODE|MANPWM|RUN> <value> or GET");
         return;
     }
 
     char *key       = strtok(NULL, " \t");
     char *valueText = strtok(NULL, " \t");
     if (!key || !valueText) {
-        Serial.println("ERR Usage: SET <KP|KI|KD|BIAS|SPBIAS|SP|ALPHA|MAXSTEP|ENTERCNT|EXITCNT|FAN|FANINV|MODE|MANPWM|RUN> <value>");
+        Serial.println("ERR Usage: SET <KP|KI|KD|BIAS|SPBIAS|SP|ALPHA|MAXSTEP|ENTERCNT|EXITCNT|FAN|FANINV|FANPWR|MODE|MANPWM|RUN> <value>");
         return;
     }
 
@@ -264,6 +269,18 @@ static void handleCommand(char *line) {
         return;
     }
 
+    // ── FANPWR ───────────────────────────────────────────────────────────────
+    if (strcmp(key, "FANPWR") == 0) {
+        if      (strcmp(valueText, "1") == 0 || strcmp(valueText, "ON")  == 0) sys.fanPowerEnabled = true;
+        else if (strcmp(valueText, "0") == 0 || strcmp(valueText, "OFF") == 0) sys.fanPowerEnabled = false;
+        else { Serial.println("ERR FANPWR must be ON or OFF"); return; }
+        applyFanPower();
+        Serial.printf("OK FANPWR set to %s\n", sys.fanPowerEnabled ? "ON" : "OFF");
+        SerialProtocol::saveConfig();
+        SerialProtocol::printConfig();
+        return;
+    }
+
     // ── Float parameters ──────────────────────────────────────────────────────
     float value = atof(valueText);
 
@@ -302,7 +319,7 @@ static void handleCommand(char *line) {
         setFanSpeedPercent(value);
         Serial.printf("OK FAN set to %.1f %% (raw %d, 255=off 0=full)\n", sys.fanSpeedPercent, sys.fanPwmApplied);
     } else {
-        Serial.println("ERR Unknown key. Use KP, KI, KD, BIAS, SPBIAS, SP, ALPHA, MAXSTEP, ENTERCNT, EXITCNT, FAN, FANINV, MODE, MANPWM, RUN");
+        Serial.println("ERR Unknown key. Use KP, KI, KD, BIAS, SPBIAS, SP, ALPHA, MAXSTEP, ENTERCNT, EXITCNT, FAN, FANINV, FANPWR, MODE, MANPWM, RUN");
         return;
     }
 

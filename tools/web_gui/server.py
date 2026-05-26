@@ -42,12 +42,13 @@ TELEMETRY_RE = re.compile(
     r"(?:\D+RUN:\s*(ON|OFF)\D+FANINV:\s*([01]))?"
     r"(?:\D+V:\s*([-+]?\d*\.?\d+)\s*V\D+I:\s*([-+]?\d*\.?\d+)\s*A\D+W:\s*([-+]?\d*\.?\d+)\s*W)?"
     r"(?:\D+EQPWM:\s*([-+]?\d*\.?\d+))?"
-    r"(?:.*?HUMIDITY:\s*([-+]?\d*\.?\d+)\s*%)?"
-    r"(?:.*?HUM_TEMP:\s*([-+]?\d*\.?\d+)\s*C)?"
-    r"(?:.*?DELTA_P1:\s*([-+]?\d*\.?\d+)\s*Pa)?"
-    r"(?:.*?DELTA_P1F:\s*([-+]?\d*\.?\d+)\s*Pa)?"
-    r"(?:.*?DELTA_P2:\s*([-+]?\d*\.?\d+)\s*Pa)?"
-    r"(?:.*?DELTA_P2F:\s*([-+]?\d*\.?\d+)\s*Pa)?"
+    r"(?:.*?FANPWR:\s*(ON|OFF))?"          # group 28
+    r"(?:.*?HUMIDITY:\s*([-+]?\d*\.?\d+)\s*%)?"   # group 29
+    r"(?:.*?HUM_TEMP:\s*([-+]?\d*\.?\d+)\s*C)?"   # group 30
+    r"(?:.*?DELTA_P1:\s*([-+]?\d*\.?\d+)\s*Pa)?"  # group 31
+    r"(?:.*?DELTA_P1F:\s*([-+]?\d*\.?\d+)\s*Pa)?" # group 32
+    r"(?:.*?DELTA_P2:\s*([-+]?\d*\.?\d+)\s*Pa)?"  # group 33
+    r"(?:.*?DELTA_P2F:\s*([-+]?\d*\.?\d+)\s*Pa)?" # group 34
 )
 
 CFG_RE = re.compile(
@@ -66,6 +67,7 @@ CFG_RE = re.compile(
     r"MODE:\s*(AUTO|MANUAL|SMART)\s*\|\s*"
     r"MANPWM:\s*([-+]?\d*\.?\d+)\s*\|\s*"
     r"RUN:\s*(ON|OFF)"
+    r"(?:\s*\|\s*FANPWR:\s*(ON|OFF))?"  # group 16, optional — absent on old firmware
 )
 
 # ---------------------------------------------------------------------------
@@ -363,13 +365,14 @@ class AppState:
             ina_voltage = float(m.group(24) or 0.0)
             ina_current = float(m.group(25) or 0.0)
             ina_power   = float(m.group(26) or 0.0)
-            eq_pwm = float(m.group(27) or 0.0)
-            humidity_pct = float(m.group(28)) if m.group(28) is not None else None
-            hum_temp_c   = float(m.group(29)) if m.group(29) is not None else None
-            delta_p1     = float(m.group(30)) if m.group(30) is not None else None
-            delta_p1f    = float(m.group(31)) if m.group(31) is not None else None
-            delta_p2     = float(m.group(32)) if m.group(32) is not None else None
-            delta_p2f    = float(m.group(33)) if m.group(33) is not None else None
+            eq_pwm    = float(m.group(27) or 0.0)
+            fan_power = m.group(28) or "ON"
+            humidity_pct = float(m.group(29)) if m.group(29) is not None else None
+            hum_temp_c   = float(m.group(30)) if m.group(30) is not None else None
+            delta_p1     = float(m.group(31)) if m.group(31) is not None else None
+            delta_p1f    = float(m.group(32)) if m.group(32) is not None else None
+            delta_p2     = float(m.group(33)) if m.group(33) is not None else None
+            delta_p2f    = float(m.group(34)) if m.group(34) is not None else None
 
             # Apply software tare offsets (zeroed by /api/pressure/tare)
             # SDP610 is factory calibrated — no scale/offset correction needed here
@@ -412,6 +415,7 @@ class AppState:
                 "ina_current": ina_current,
                 "power_w": ina_power,
                 "eq_pwm": eq_pwm,
+                "fan_power": fan_power,
                 "humidity_pct": humidity_pct,
                 "hum_temp_c": hum_temp_c,
                 "delta_p1":   delta_p1,
@@ -469,6 +473,7 @@ class AppState:
                         "effective_setpoint_c": effsp,
                         "fan_speed_pct": fan_speed,
                         "fan_pwm_raw": int(round(fan_pwm)),
+                        "fan_power": fan_power,
                         "mode": ctrl_mode,
                         "state": ctrl_state,
                         "manual_pwm_cmd": manpwm,
@@ -509,6 +514,7 @@ class AppState:
                 "ctrl_mode": c.group(13),
                 "manpwm": c.group(14),
                 "run": c.group(15),
+                "fan_power": c.group(16) if c.group(16) is not None else "ON",
             }
             self.last_cfg = cfg
             self.broadcast_sync(cfg)
@@ -520,9 +526,9 @@ class AppState:
         "timestamp_iso", "elapsed_s", "raw_temp_c", "temp_filtered_c",
         "temp_smooth_c", "pwm", "p_term", "i_term", "d_term", "pid_out",
         "pid_bias", "setpoint_bias_c", "setpoint_c", "effective_setpoint_c",
-        "fan_speed_pct", "fan_pwm_raw", "mode", "state", "manual_pwm_cmd",
-        "hold_pwm", "enter_progress_pct", "exit_progress_pct", "abs_error_c",
-        "run_state", "fan_inverted", "humidity_pct", "hum_temp_c",
+        "fan_speed_pct", "fan_pwm_raw", "fan_power", "mode", "state",
+        "manual_pwm_cmd", "hold_pwm", "enter_progress_pct", "exit_progress_pct",
+        "abs_error_c", "run_state", "fan_inverted", "humidity_pct", "hum_temp_c",
         "delta_p1_pa", "delta_p1f_pa", "delta_p2_pa", "delta_p2f_pa",
         "event",
     ]
@@ -539,7 +545,7 @@ class AppState:
             self.csv_file = open(path, "w", newline="", encoding="utf-8")
             # Write metadata comment header
             start_iso = dt.datetime.now(dt.timezone.utc).astimezone().isoformat(timespec="seconds")
-            self.csv_file.write(f"# schema_version: 3\n")
+            self.csv_file.write(f"# schema_version: 4\n")
             self.csv_file.write(f"# run_id: {self.pending_run_id}\n")
             self.csv_file.write(f"# heatsink_id: {self.pending_heatsink_id}\n")
             self.csv_file.write(f"# start_time: {start_iso}\n")
@@ -596,6 +602,7 @@ class VirtualMCU:
         self.exitcnt = 10
         self.fan = 0.4
         self.fan_inv = 0
+        self.fan_power = "ON"
         self.mode = "SMART"
         self.manpwm = 30.0
         self.run = "ON"
@@ -662,6 +669,9 @@ class VirtualMCU:
                 elif key == "RUN":
                     if val in ("ON", "OFF"):
                         self.run = val
+                elif key == "FANPWR":
+                    if val in ("ON", "OFF"):
+                        self.fan_power = val
                 self._state.broadcast_sync({"type": "log", "text": f"OK {key} set to {val}"})
                 self._broadcast_cfg()
             except ValueError:
@@ -673,7 +683,7 @@ class VirtualMCU:
             f"BIAS: {self.bias:.2f} | SPBIAS: {self.spbias:.2f} | SP: {self.sp:.2f} | "
             f"ALPHA: {self.alpha:.3f} | MAXSTEP: {self.maxstep} | ENTCNT: {self.entercnt} | "
             f"EXTCNT: {self.exitcnt} | FAN: {self.fan*100:.1f} | FANINV: {self.fan_inv} | "
-            f"MODE: {self.mode} | MANPWM: {self.manpwm:.2f} | RUN: {self.run}"
+            f"MODE: {self.mode} | MANPWM: {self.manpwm:.2f} | RUN: {self.run} | FANPWR: {self.fan_power}"
         )
         self._state.broadcast_sync({"type": "log", "text": line})
         self._state._handle_line(line)
@@ -755,7 +765,7 @@ class VirtualMCU:
                 f"MODE: {self.mode} | STATE: {self._ctrl_state} | "
                 f"MANPWM: {self.manpwm:.2f} | HOLDPWM: {self._holdpwm:.2f} | "
                 f"ENTPROG: {self._enter_prog*100:.1f} | EXTPROG: {self._exit_prog*100:.1f} | "
-                f"EABS: {abs_err_val:.2f} | RUN: {self.run} | FANINV: {self.fan_inv} | "
+                f"EABS: {abs_err_val:.2f} | RUN: {self.run} | FANINV: {self.fan_inv} | FANPWR: {self.fan_power} | "
                 f"V: {voltage_v:.3f} V | I: {current_a:.4f} A | W: {power_calc:.3f} W | "
                 f"DELTA_P1: {p1_raw:.2f} Pa | DELTA_P1F: {self._p1_ema:.2f} Pa | "
                 f"DELTA_P2: {p2_raw:.2f} Pa | DELTA_P2F: {self._p2_ema:.2f} Pa"

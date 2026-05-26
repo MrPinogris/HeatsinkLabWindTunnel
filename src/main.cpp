@@ -9,6 +9,7 @@
 // ── Pin definitions ────────────────────────────────────────────────────────────
 static const int PIN_HEATER_MOSFET = 4;
 static const int PIN_FAN_PWM       = 5;
+static const int PIN_FAN_POWER     = 10;  // MOSFET gate — HIGH = fan powered, LOW = fan fully off
 
 // ── PWM channels ──────────────────────────────────────────────────────────────
 static const int HEATER_PWM_CH  = 0;
@@ -63,6 +64,7 @@ static void initSysDefaults() {
     sys.fanSpeedPercent    = 0.0f;
     sys.fanPwmInverted     = false;
     sys.fanPwmApplied      = 255;
+    sys.fanPowerEnabled    = true;
     sys.controlMode        = MODE_AUTO;
     sys.manualPwmTarget    = 0.0f;
     sys.controlEnabled     = true;
@@ -94,6 +96,10 @@ void setFanSpeedPercent(float percent) {
         ledcWrite(FAN_PWM_CH, 0);
         sys.fanPwmApplied = 0;
     }
+}
+
+void applyFanPower() {
+    digitalWrite(PIN_FAN_POWER, sys.fanPowerEnabled ? HIGH : LOW);
 }
 
 static void setPWM(int duty) {
@@ -171,6 +177,8 @@ void setup() {
 
     setPWM(0);
     setFanSpeedPercent(sys.fanSpeedPercent);
+    pinMode(PIN_FAN_POWER, OUTPUT);
+    applyFanPower();
     applyPidTunings();
     resetSmartState();
 
@@ -191,7 +199,7 @@ void setup() {
     // ─────────────────────────────────────────────────────────────────────
 
     Serial.println("System started");
-    Serial.println("Commands: GET, SET KP <v>, SET KI <v>, SET KD <v>, SET BIAS <v>, SET SPBIAS <v>, SET SP <v>, SET ALPHA <v>, SET MAXSTEP <v>, SET ENTERCNT <1..400>, SET EXITCNT <1..400>, SET FAN <0..100>, SET FANINV <0|1>, SET MODE <AUTO|MANUAL|SMART>, SET MANPWM <0..255>, SET RUN <ON|OFF>");
+    Serial.println("Commands: GET, SET KP <v>, SET KI <v>, SET KD <v>, SET BIAS <v>, SET SPBIAS <v>, SET SP <v>, SET ALPHA <v>, SET MAXSTEP <v>, SET ENTERCNT <1..400>, SET EXITCNT <1..400>, SET FAN <0..100>, SET FANINV <0|1>, SET FANPWR <ON|OFF>, SET MODE <AUTO|MANUAL|SMART>, SET MANPWM <0..255>, SET RUN <ON|OFF>");
     SerialProtocol::printConfig();
 }
 
