@@ -483,6 +483,8 @@ class AppState:
                         "abs_error_c": abs_err,
                         "run_state": run_state,
                         "fan_inverted": 1 if fan_inv == "1" else 0,
+                        "humidity_pct": "" if humidity_pct is None else humidity_pct,
+                        "hum_temp_c":   "" if hum_temp_c  is None else hum_temp_c,
                         "delta_p1_pa":  "" if delta_p1  is None else delta_p1,
                         "delta_p1f_pa": "" if delta_p1f is None else delta_p1f,
                         "delta_p2_pa":  "" if delta_p2  is None else delta_p2,
