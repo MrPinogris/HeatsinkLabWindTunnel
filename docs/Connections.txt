@@ -1,0 +1,49 @@
+## General
+
+12V supplied via lab power supply
+GND LAB connected to GND ESP
+
+### HEATER POWER
+12V to mossfet module(HEATER) IN+ 
+GND to mossfet module(HEATER) IN-
+mossfet module(HEATER) OUT- to Current sensor INA226 I-
+Current sensor INA226 I- to Heater
+mossfet module(HEATER) OUt+ to Heater
+ESP PIN 4 to mossfet module(heater) Signal
+GND LAB POWER to mossfet module(heater) Signal
+
+### Fan power
+12V to mossfet module(FAN) IN+ 
+GND to mossfet module(FAN) IN-
+ESP PIN 5 to FAN PWM
+ESP PIN 10 TO MOSSFET module(fan) signal
+GND LAB POWER TO MOSSFET module(fan) signal
+
+THERMOCOUPLE MAX 6675
+GND ESP to GND Thermocouple module
+VCC ESP to VCC Thermocouple module
+ESP pin 13 to SCK Thermocouple module
+ESP pin 12 to CS Thermocouple module
+ESP pin 11 to SO Thermocouple module
+
+Powersensor INA226 (I²C address: 0x41)
+ESP pin 15 to SDA INA226
+ESP pin 16 to SCL INA226
+VCC ESP to VCC INA226
+GND ESP to GND INA226
+ALE INA226 NC
+VBS INA226 NC
+
+Pressure Sensor sensirion (I²C address: 0x40)
+ESP pin 15 to SDA Pressure sensor
+ESP pin 16 to SCL Pressure sensor
+VCC ESP to VCC Pressure sensor
+GND ESP to GND Pressure sensor
+
+Humidity sensor sensirion (I²C address: 0xF6)
+ESP pin 15 to SDA Humidity sensor
+ESP pin 16 to SCL Humidity sensor
+VCC ESP to VCC Humidity sensor
+GND ESP to GND Humidity sensor
+
+
