@@ -452,8 +452,8 @@
           <input type="number" id="soakTime" value="60" min="5" max="600" style="width:90px;">
         </div>
         <div class="col">
-          <label class="lbl">Ambient temp (°C)</label>
-          <input type="number" id="ambientTemp" value="20" min="0" max="50" style="width:90px;">
+          <label class="lbl">Ambient temp (°C) <span id="ambientSrc" style="font-weight:400;color:var(--text-muted);">(manual)</span></label>
+          <input type="number" id="ambientTemp" value="20" min="0" max="50" style="width:90px;" title="Auto-filled from humidity sensor temperature when connected">
         </div>
         <div class="col">
           <label class="lbl">Fan settle time (s)</label>
@@ -797,6 +797,12 @@ function handleMsg(msg) {
 
   if (msg.type === 'telemetry') {
     lastTelemetry = msg;
+    if (msg.hum_temp_c != null) {
+      document.getElementById('ambientTemp').value = Number(msg.hum_temp_c).toFixed(1);
+      const src = document.getElementById('ambientSrc');
+      src.textContent = '(from sensor)';
+      src.style.color = 'var(--green)';
+    }
     if (testRunning) {
       updateLiveStats(msg);
       pushChartPoint(msg);
