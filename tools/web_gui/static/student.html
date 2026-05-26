@@ -478,8 +478,8 @@
 
     <div class="overall-row">
       <span><strong id="ovWind">–</strong></span>
-      <span>Temp step <strong id="ovStep">–</strong></span>
-      <span>Wind speed group <strong id="ovGroup">–</strong></span>
+      <span>Fan step <strong id="ovStep">–</strong></span>
+      <span>Temp group <strong id="ovGroup">–</strong></span>
     </div>
 
     <div class="phase-row">
@@ -527,7 +527,7 @@
         <div class="series-dd-panel" id="seriesPanel"></div>
       </div>
       <label style="margin-left:auto;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:5px;cursor:pointer;">
-        <input type="checkbox" id="clearPerWind" checked> Clear chart per wind speed
+        <input type="checkbox" id="clearPerTemp" checked> Clear chart per temperature
       </label>
     </div>
     <div class="chart-canvas-wrap">
@@ -584,10 +584,12 @@ let testRunning  = false;
 let testResults  = [];
 let windSpeeds   = [];
 let testTemps    = [];
-let windIdx = 0, tempIdx = 0;
+let tempIdx = 0, windIdx = 0;   // tempIdx = outer (temperature), windIdx = inner (fan)
 let soakCountdown = 0, soakTotal = 0;
 let soakInterval = null, settleTimer = null;
 let soakTriggered = false;
+let settling = false;
+let expectedSP = null;
 let lastEnterProg = 0;
 let testStartTs = null, chartSegTs = null;
 let chartMarkers = [];
@@ -991,7 +993,8 @@ async function startTest() {
   hideStartErr();
 
   testResults = [];
-  windIdx = 0; tempIdx = 0;
+  tempIdx = 0; windIdx = 0;
+  settling = false; expectedSP = null;
   testRunning = true;
   testStartTs = Date.now() / 1000;
   chartSegTs = testStartTs;
@@ -1006,75 +1009,115 @@ async function startTest() {
 
   await startCsv();
   await sendAmbient();
-  await cmd('SET MODE SMART');
-  // Apply fan power state BEFORE enabling the control loop
-  const firstFan = windSpeeds[0];
-  if (firstFan < 0) {
+  // Set SP and fan BEFORE turning heater on so we never heat to a stale NVS setpoint
+  const initFan = windSpeeds[0];
+  const initSP  = testTemps[0];
+  if (initFan < 0) {
     await cmd('SET FANPWR OFF');
   } else {
     await cmd('SET FANPWR ON');
-    await cmd('SET FAN ' + firstFan.toFixed(1));
+    await cmd('SET FAN ' + initFan.toFixed(1));
   }
+  await cmd('SET SP ' + initSP);
+  await cmd('SET MODE SMART');
   await cmd('SET RUN ON');
-  startWindGroup();
+  startTempGroup();
 }
 
 function fanLabel(fan) {
   return fan < 0 ? 'Fan OFF' : fan + '%';
 }
 
-async function startWindGroup() {
+// Outer loop: one group per target temperature.
+// Inner loop (goToWind) iterates all fan speeds at that temperature.
+// Order: heat up once to each temp, sweep all fans — avoids slow cool-downs.
+async function startTempGroup() {
   if (!testRunning) return;
-  if (windIdx >= windSpeeds.length) { finishTest(); return; }
+  if (tempIdx >= testTemps.length) { finishTest(); return; }
 
-  const fan = windSpeeds[windIdx];
-  const fanOff = fan < 0;
+  const sp = testTemps[tempIdx];
+  windIdx = 0;
+  expectedSP = sp;
 
-  if (document.getElementById('clearPerWind').checked) {
+  clearInterval(soakInterval);
+  soakCountdown = 0; soakTotal = 0;
+  soakTriggered = false;
+  settling = false;
+
+  if (document.getElementById('clearPerTemp').checked) {
     clearChart();
     chartSegTs = Date.now() / 1000;
   }
-  addChartMarker(fanLabel(fan));
-  addGroupHeader(fan);
+  addChartMarker(sp + '°C');
+  addTempGroupHeader(sp);
 
-  if (fanOff) {
+  if (tempIdx > 0) {
+    // Reset to first fan speed for this temperature group
+    const fan = windSpeeds[0];
+    if (fan < 0) {
+      await cmd('SET FANPWR OFF');
+    } else {
+      await cmd('SET FANPWR ON');
+      await cmd('SET FAN ' + fan.toFixed(1));
+    }
+    // Force SMART mode to exit HOLD before applying new SP — otherwise the
+    // firmware stays locked at the previous temperature's equilibrium PWM
+    // if EXITCNT is configured high in NVS.
+    await cmd('SET MODE AUTO');
+    await cmd('SET SP ' + sp);
+    cmd('SET MODE SMART');
+  }
+
+  setPhase('heating', `Heating to ${sp}°C…`);
+  setOverall(windSpeeds[0], `1 / ${windSpeeds.length}`, `${tempIdx + 1} of ${testTemps.length}`);
+  setSoakBar(0, 1);
+}
+
+async function goToWind() {
+  if (!testRunning) return;
+  if (windIdx >= windSpeeds.length) { tempIdx++; await startTempGroup(); return; }
+
+  const fan = windSpeeds[windIdx];
+  const sp  = testTemps[tempIdx];
+
+  clearInterval(soakInterval);
+  soakCountdown = 0; soakTotal = 0;
+  soakTriggered = false;
+  expectedSP = sp;
+
+  // Change fan speed, then force SMART mode to exit HOLD so it re-stabilises
+  // at the new airflow (same SP, different equilibrium PWM).
+  if (fan < 0) {
     await cmd('SET FANPWR OFF');
   } else {
     await cmd('SET FANPWR ON');
     await cmd('SET FAN ' + fan.toFixed(1));
   }
+  await cmd('SET MODE AUTO');
+  cmd('SET MODE SMART');
 
   const settle = parseInt(document.getElementById('settleTime').value) || 5;
+  settling = true;
   setPhase('settling', `${fanLabel(fan)} — settling for ${settle}s…`);
-  setOverall(fan, '–', '–');
+  setOverall(fan, `${windIdx + 1} / ${windSpeeds.length}`, `${tempIdx + 1} of ${testTemps.length}`);
+  setSoakBar(0, 1);
 
   clearTimeout(settleTimer);
   settleTimer = setTimeout(() => {
-    tempIdx = 0;
-    soakTriggered = false;
-    goToTemp();
+    settling = false;
+    if (!testRunning) return;
+    setPhase('heating', `Re-stabilising at ${sp}°C, ${fanLabel(fan)}…`);
   }, settle * 1000);
-}
-
-async function goToTemp() {
-  if (!testRunning) return;
-  if (tempIdx >= testTemps.length) { windIdx++; await startWindGroup(); return; }
-
-  const sp = testTemps[tempIdx];
-  clearInterval(soakInterval);
-  soakCountdown = 0; soakTotal = 0;
-  soakTriggered = false;
-
-  setPhase('heating', `Heating to ${sp}°C…`);
-  setOverall(windSpeeds[windIdx], `${tempIdx + 1} / ${testTemps.length}`, `${windIdx + 1} of ${windSpeeds.length}`);
-  setSoakBar(0, 1);
-  cmd('SET SP ' + sp);
 }
 
 function onTelemetry(d) {
   if (!testRunning) return;
   const ep = d.enter_prog ?? 0;
   lastEnterProg = ep;
+
+  // Ignore enter_prog while fan is settling or firmware SP hasn't updated yet
+  if (settling) return;
+  if (expectedSP !== null && Math.abs((d.sp ?? 0) - expectedSP) > 1.0) return;
 
   if (ep >= 100 && !soakTriggered) {
     soakTriggered = true;
@@ -1113,9 +1156,9 @@ function recordResult(d) {
   testResults.push(row);
   addResultRow(row);
   soakCountdown = 0;
-  tempIdx++;
+  windIdx++;
   soakTriggered = false;
-  goToTemp();
+  goToWind();
 }
 
 async function finishTest() {
@@ -1187,10 +1230,10 @@ function updateLiveStats(d) {
   document.getElementById('lRth').textContent = r_th != null ? r_th.toFixed(3) : '–';
 }
 
-function addGroupHeader(fan) {
+function addTempGroupHeader(sp) {
   const tr = document.createElement('tr');
   tr.className = 'wind-group-row';
-  tr.innerHTML = `<td colspan="7">Wind speed: ${fan < 0 ? 'Fan OFF (MOSFET — zero airflow)' : fan + '% fan'}</td>`;
+  tr.innerHTML = `<td colspan="7">Setpoint: ${sp}°C</td>`;
   document.getElementById('resultsBody').appendChild(tr);
 }
 
