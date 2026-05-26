@@ -12,7 +12,8 @@ from docx.enum.section import WD_SECTION
 import copy
 from lxml import etree
 
-OUTPUT = r"C:\Users\alexa\OneDrive\Documents\HeatsinkLabWindTunnel\.claude\worktrees\tender-pike\docs\wiring_schematic.docx"
+import os as _os
+OUTPUT = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "wiring_schematic.docx")
 
 # ── colour constants ────────────────────────────────────────────────────────
 DARK_BLUE   = "1F4E79"   # header bar
