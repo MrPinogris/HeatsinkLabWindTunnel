@@ -113,7 +113,6 @@ class AppState:
         self.pending_heatsink_id: str = ""
 
         self.websockets: list[WebSocket] = []
-        self.ws_lock = asyncio.Lock()
 
         self.loop: asyncio.AbstractEventLoop | None = None
         self._virt: "VirtualMCU | None" = None
@@ -160,9 +159,7 @@ class AppState:
         if not self.websockets:
             return
         text = json.dumps(msg)
-        # Snapshot the list under the lock (no IO while holding it).
-        async with self.ws_lock:
-            targets = list(self.websockets)
+        targets = list(self.websockets)
         if not targets:
             return
         # Send to all clients concurrently; enforce a per-client timeout so a
@@ -171,12 +168,9 @@ class AppState:
             *(self._send_one(ws, text) for ws in targets),
             return_exceptions=True,
         )
-        dead = [ws for ws, ok in zip(targets, results) if ok is not True]
-        if dead:
-            async with self.ws_lock:
-                for ws in dead:
-                    if ws in self.websockets:
-                        self.websockets.remove(ws)
+        for ws, ok in zip(targets, results):
+            if ok is not True and ws in self.websockets:
+                self.websockets.remove(ws)
 
     @staticmethod
     async def _send_one(ws: "WebSocket", text: str) -> bool:
@@ -1094,8 +1088,7 @@ async def pressure_tare_reset() -> JSONResponse:
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
-    async with state.ws_lock:
-        state.websockets.append(websocket)
+    state.websockets.append(websocket)
 
     # Send current status immediately on connect
     await websocket.send_text(json.dumps({
@@ -1126,9 +1119,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     except Exception:
         pass
     finally:
-        async with state.ws_lock:
-            if websocket in state.websockets:
-                state.websockets.remove(websocket)
+        if websocket in state.websockets:
+            state.websockets.remove(websocket)
 
 
 # ---------------------------------------------------------------------------
