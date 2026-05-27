@@ -807,7 +807,7 @@ state = AppState()
 # ---------------------------------------------------------------------------
 @app.on_event("startup")
 async def on_startup() -> None:
-    state.loop = asyncio.get_event_loop()
+    state.loop = asyncio.get_running_loop()
 
 
 @app.on_event("shutdown")
@@ -840,7 +840,8 @@ async def list_ports() -> JSONResponse:
 async def connect(payload: dict) -> JSONResponse:
     port = payload.get("port", "")
     baud = int(payload.get("baud", 115200))
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
+    state.loop = loop  # ensure broadcast_sync always has the correct loop
     try:
         ok, msg = await asyncio.wait_for(
             loop.run_in_executor(None, lambda: state.connect(port, baud)),
