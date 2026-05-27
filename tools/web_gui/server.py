@@ -289,6 +289,12 @@ class AppState:
             try:
                 line = self.serial_conn.readline().decode("utf-8", errors="replace").strip()
             except Exception as exc:
+                err_str = str(exc)
+                if "ClearCommError" in err_str:
+                    # Non-fatal: some USB-serial adapters (CH340, CP2102) don't
+                    # support this Windows API call. Sleep briefly and keep reading.
+                    time.sleep(0.05)
+                    continue
                 print(f"[serial] read error: {exc}", flush=True)
                 self.broadcast_sync({"type": "log", "text": f"Serial read error: {exc}"})
                 self.broadcast_sync({"type": "disconnected", "reason": str(exc)})
