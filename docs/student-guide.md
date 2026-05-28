@@ -35,9 +35,11 @@ Slide the heater module into the opening in the wind tunnel. Route the heater wi
 
 ---
 
-### Step 3 — Insert the thermocouple
+### Step 3 — Insert and connect the thermocouple
 
 Push the thermocouple probe firmly all the way into the drilled hole in the copper plate. It must be fully seated to read temperature accurately.
+
+Then connect the other end of the thermocouple cable to the **MAX6675 thermocouple module** on the PCB. The module has a small two-pin terminal block — insert the two thermocouple wires (one per terminal) and tighten the screws. Polarity matters: the **negative wire** (usually red on a K-type thermocouple) goes to the **−** terminal, and the **positive wire** goes to the **+** terminal. If the temperature reads 0 °C or jumps erratically after connecting, swap the two wires.
 
 ![Installing thermocouple into copper plate](./media/guide/hw-04.jpeg)
 ![Thermocouple correctly installed](./media/guide/hw-05.jpeg)
