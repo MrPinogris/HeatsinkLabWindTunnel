@@ -1,3 +1,4 @@
-fastapi
-uvicorn[standard]
-pyserial
+fastapi>=0.115.0,<0.136.0
+uvicorn>=0.30.0,<0.47.0
+websockets>=10.4,<17.0
+pyserial>=3.5,<4.0
