@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HeatsinkLab Wind Tunnel — Student Guide</title>
+<style>
+  :root {
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --warn: #b45309;
+    --warn-bg: #fef3c7;
+    --warn-border: #f59e0b;
+    --success: #15803d;
+    --success-bg: #dcfce7;
+    --text: #111827;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --bg: #ffffff;
+    --step-size: 2.5rem;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  /* ── Title page ── */
+  .title-page {
+    text-align: center;
+    padding: 3rem 0 2.5rem;
+    border-bottom: 3px solid var(--accent);
+    margin-bottom: 2.5rem;
+  }
+  .title-page h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+  .title-page .subtitle {
+    font-size: 1.1rem;
+    color: var(--muted);
+  }
+
+  /* ── Safety box ── */
+  .safety {
+    background: var(--warn-bg);
+    border: 2px solid var(--warn-border);
+    border-left: 6px solid var(--warn);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+  .safety .safety-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--warn);
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .safety ul {
+    padding-left: 1.4rem;
+  }
+  .safety li {
+    margin-bottom: 0.4rem;
+  }
+
+  /* ── Part headings ── */
+  .part-heading {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    margin: 2.5rem 0 2rem;
+  }
+  .part-heading .part-number {
+    font-size: 1.8rem;
+    font-weight: 800;
+    opacity: 0.8;
+    min-width: 2.2rem;
+  }
+  .part-heading h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+
+  /* ── Step cards ── */
+  .step {
+    display: grid;
+    grid-template-columns: var(--step-size) 1fr;
+    gap: 0 1.25rem;
+    margin-bottom: 2.5rem;
+    position: relative;
+  }
+  .step::before {
+    content: '';
+    position: absolute;
+    left: calc(var(--step-size) / 2 - 1px);
+    top: var(--step-size);
+    bottom: -2.5rem;
+    width: 2px;
+    background: var(--border);
+  }
+  .step:last-child::before { display: none; }
+
+  .step-num {
+    width: var(--step-size);
+    height: var(--step-size);
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .step-body { min-width: 0; }
+  .step-body h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    padding-top: 0.35rem;
+  }
+  .step-body p { margin-bottom: 0.6rem; color: #374151; }
+
+  /* ── Note boxes inside steps ── */
+  .note {
+    background: var(--accent-light);
+    border-left: 4px solid var(--accent);
+    border-radius: 4px;
+    padding: 0.7rem 1rem;
+    margin: 0.7rem 0;
+    font-size: 0.95rem;
+  }
+  .note strong { color: var(--accent); }
+
+  /* ── Tip box (success) ── */
+  .tip {
+    background: var(--success-bg);
+    border-left: 4px solid var(--success);
+    border-radius: 4px;
+    padding: 0.7rem 1rem;
+    margin: 0.7rem 0;
+    font-size: 0.95rem;
+  }
+
+  /* ── Photo grid ── */
+  .photo-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 0.75rem;
+    margin: 0.8rem 0 0.4rem;
+  }
+  .photo-row.single { grid-template-columns: 1fr; max-width: 480px; }
+
+  figure {
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  figure img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  figcaption {
+    font-size: 0.8rem;
+    color: var(--muted);
+    padding: 0.4rem 0.6rem;
+    border-top: 1px solid var(--border);
+    background: #f9fafb;
+  }
+
+  /* ── Screenshot style (wider) ── */
+  .screenshot {
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 0.8rem 0;
+  }
+  .screenshot img { width: 100%; display: block; }
+  .screenshot figcaption {
+    background: var(--accent-light);
+    border-top: 2px solid var(--accent);
+    font-size: 0.85rem;
+    color: var(--accent);
+    font-weight: 600;
+    padding: 0.4rem 0.75rem;
+  }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+    margin: 0.8rem 0;
+  }
+  th {
+    background: var(--accent);
+    color: #fff;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f9fafb; }
+  td code {
+    background: #e5e7eb;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.9em;
+  }
+
+  /* ── Troubleshooting section ── */
+  .troubleshoot-section {
+    background: #f9fafb;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-top: 3rem;
+  }
+  .troubleshoot-section h2 {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    color: var(--accent);
+  }
+
+  /* ── Print ── */
+  @media print {
+    body { max-width: 100%; padding: 1cm; font-size: 11pt; }
+    .part-heading { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .step::before { display: none; }
+    .step { page-break-inside: avoid; }
+    figure { page-break-inside: avoid; }
+    .safety { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Title -->
+<div class="title-page">
+  <h1>HeatsinkLab Wind Tunnel</h1>
+  <p class="subtitle">Student Operating Guide &nbsp;·&nbsp; Thermal Characterisation of Heatsinks</p>
+</div>
+
+<!-- Safety -->
+<div class="safety">
+  <div class="safety-title">⚠ Safety — read before touching anything</div>
+  <ul>
+    <li>The ceramic heater element and copper spreader plate reach high temperatures during a test. <strong>Never touch the copper plate during or after a test</strong> — it stays hot for several minutes after shutdown.</li>
+    <li><strong>Never turn on the lab power supply until the very last step.</strong> All cables must be connected first.</li>
+    <li>If the temperature on screen climbs unexpectedly or the system behaves oddly, click <strong>Stop</strong> immediately and call the lab supervisor.</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!--  PART 1 — HARDWARE SETUP                           -->
+<!-- ═══════════════════════════════════════════════════ -->
+
+<div class="part-heading">
+  <span class="part-number">1</span>
+  <h2>Hardware Setup</h2>
+</div>
+
+<p style="margin-bottom:2rem;color:#374151;">Follow these steps every time you set up the wind tunnel for a new test session.</p>
+
+<!-- Step 1 -->
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-body">
+    <h3>Mount the heatsink onto the heater module</h3>
+    <p>Clip the heatsink under test firmly onto the copper spreader plate on the heater module. Press it flat — a loose heatsink gives inaccurate results.</p>
+    <div class="photo-row">
+      <figure>
+        <img src="media/guide/hw-01.jpeg" alt="Installing heatsink onto heater module">
+        <figcaption>Clip the heatsink onto the copper plate</figcaption>
+      </figure>
+      <figure>
+        <img src="media/guide/hw-02.jpeg" alt="Heatsink correctly installed">
+        <figcaption>Heatsink fully seated — check it is flush</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 2 -->
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-body">
+    <h3>Insert the heater module into the wind tunnel</h3>
+    <p>Slide the heater module into the opening in the wind tunnel. Route the heater wire harness out through the side cutout in the plexiglass channel.</p>
+    <div class="photo-row single">
+      <figure>
+        <img src="media/guide/hw-03.jpeg" alt="Heater module placed in wind tunnel">
+        <figcaption>Heater module in position — wire harness exits through the side</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 3 -->
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-body">
+    <h3>Insert and connect the thermocouple</h3>
+    <p>Push the thermocouple probe firmly all the way into the drilled hole in the copper plate. It must be fully seated to read temperature accurately.</p>
+    <p>Then connect the other end of the thermocouple cable to the <strong>MAX6675 thermocouple module</strong> on the PCB. The module has a small two-pin terminal block — insert the two thermocouple wires (one per terminal) and tighten the screws.</p>
+    <div class="note"><strong>Polarity matters:</strong> the <strong>negative wire</strong> (usually red on a K-type thermocouple) goes to the <strong>−</strong> terminal; the <strong>positive wire</strong> goes to the <strong>+</strong> terminal. If the temperature reads 0 °C or jumps erratically after connecting, swap the two wires.</div>
+    <div class="photo-row">
+      <figure>
+        <img src="media/guide/hw-04.jpeg" alt="Inserting thermocouple into copper plate">
+        <figcaption>Insert probe into the drilled hole</figcaption>
+      </figure>
+      <figure>
+        <img src="media/guide/hw-05.jpeg" alt="Thermocouple fully inserted">
+        <figcaption>Thermocouple fully seated</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 4 -->
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-body">
+    <h3>Mount the PCB</h3>
+    <p>Place the control PCB onto the heater plate module.</p>
+    <div class="note"><strong>Important:</strong> Place the isolating pad between the metal frame and the PCB before setting it down. Skipping this can cause a short circuit.</div>
+    <div class="photo-row single">
+      <figure>
+        <img src="media/guide/hw-06.jpeg" alt="PCB mounted onto heater plate module with isolating pad">
+        <figcaption>PCB placed with isolating pad underneath — check pad is visible</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 5 -->
+<div class="step">
+  <div class="step-num">5</div>
+  <div class="step-body">
+    <h3>Connect the pressure sensor cable to the sensor</h3>
+    <p>The cable connector is keyed with a white tape marker. Match the white tape on the cable to the white tape on the pressure sensor — <strong>direction matters</strong>.</p>
+    <div class="photo-row">
+      <figure>
+        <img src="media/guide/hw-07.jpeg" alt="Pressure sensor cable before connection — white tape alignment">
+        <figcaption>Align white tape marks before connecting</figcaption>
+      </figure>
+      <figure>
+        <img src="media/guide/hw-08.jpeg" alt="Pressure sensor cable correctly connected">
+        <figcaption>Cable correctly connected to sensor</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 6 -->
+<div class="step">
+  <div class="step-num">6</div>
+  <div class="step-body">
+    <h3>Connect the pressure sensor tubes to the wind tunnel</h3>
+    <p>The silicone tubes are colour-coded. Match each tube colour to the corresponding port on the wind tunnel.</p>
+    <div class="photo-row">
+      <figure>
+        <img src="media/guide/hw-09.jpeg" alt="Pressure sensor tubes connected to wind tunnel">
+        <figcaption>Tubes connected to wind tunnel ports</figcaption>
+      </figure>
+      <figure>
+        <img src="media/guide/hw-10.jpeg" alt="Other view of colour-coded tubes">
+        <figcaption>Match colours — both ends colour-coded</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 7 -->
+<div class="step">
+  <div class="step-num">7</div>
+  <div class="step-body">
+    <h3>Connect the pressure sensor cable to the PCB</h3>
+    <p>Plug the P1 connector into the P1 socket on the PCB. The white tape marker must face the same direction on both ends.</p>
+    <div class="photo-row">
+      <figure>
+        <img src="media/guide/hw-11.jpeg" alt="P1 cable ready to connect to PCB — white tape alignment">
+        <figcaption>P1 to P1 — align white tape on both connectors</figcaption>
+      </figure>
+      <figure>
+        <img src="media/guide/hw-12.jpeg" alt="P1 cable correctly connected to PCB">
+        <figcaption>P1 cable correctly connected</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 8 -->
+<div class="step">
+  <div class="step-num">8</div>
+  <div class="step-body">
+    <h3>Connect the heater plate cable to the PCB</h3>
+    <p>The heater plate wire harness plugs into the matching connector on the PCB. Press it in until it clicks.</p>
+    <div class="photo-row">
+      <figure>
+        <img src="media/guide/hw-13.jpeg" alt="Heater plate cable before connection">
+        <figcaption>Heater plate cable ready to plug in</figcaption>
+      </figure>
+      <figure>
+        <img src="media/guide/hw-14.jpeg" alt="Heater plate cable correctly connected to PCB">
+        <figcaption>Heater plate cable correctly connected</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 9 -->
+<div class="step">
+  <div class="step-num">9</div>
+  <div class="step-body">
+    <h3>Connect the motor (fan) cable to the PCB</h3>
+    <p>The fan motor cable also uses the white tape alignment rule. M1 on the cable connects to M1 on the PCB.</p>
+    <div class="photo-row">
+      <figure>
+        <img src="media/guide/hw-15.jpeg" alt="Motor cable — white tape alignment, M1 to M1">
+        <figcaption>M1 to M1 — align white tape</figcaption>
+      </figure>
+      <figure>
+        <img src="media/guide/hw-16.jpeg" alt="Motor cable correctly connected">
+        <figcaption>Motor cable correctly connected</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 10 -->
+<div class="step">
+  <div class="step-num">10</div>
+  <div class="step-body">
+    <h3>Connect the humidity sensor cable to the PCB</h3>
+    <div class="photo-row single">
+      <figure>
+        <img src="media/guide/hw-17.jpeg" alt="Humidity sensor cable correctly connected to PCB">
+        <figcaption>Humidity sensor cable connected</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 11 -->
+<div class="step">
+  <div class="step-num">11</div>
+  <div class="step-body">
+    <h3>Verify all connectors</h3>
+    <p>Step back and look at the PCB. Every connector should be fully seated with no loose cables. Compare with the photo below.</p>
+    <div class="photo-row single">
+      <figure>
+        <img src="media/guide/hw-18.jpeg" alt="All sensor cables correctly connected — full view">
+        <figcaption>All connectors seated — your PCB should look like this</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 12 -->
+<div class="step">
+  <div class="step-num">12</div>
+  <div class="step-body">
+    <h3>Verify lab power supply voltage</h3>
+    <p>Turn on the lab power supply briefly and confirm the display reads <strong>12 V</strong>. Then <strong>turn it off again</strong> — do not connect the power cable while the supply is live.</p>
+    <div class="photo-row single">
+      <figure>
+        <img src="media/guide/hw-19.jpeg" alt="Lab power supply — confirm 12 V then turn off">
+        <figcaption>Confirm 12 V → turn supply OFF before proceeding</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 13 -->
+<div class="step">
+  <div class="step-num">13</div>
+  <div class="step-body">
+    <h3>Connect the power cable to the PCB</h3>
+    <p>With the power supply off, plug the power cable into the PCB power connector.</p>
+    <div class="photo-row">
+      <figure>
+        <img src="media/guide/hw-20.jpeg" alt="Installing power cable to PCB">
+        <figcaption>Plug power cable into PCB</figcaption>
+      </figure>
+      <figure>
+        <img src="media/guide/hw-21.jpeg" alt="Power cable installed — USB position visible">
+        <figcaption>Power cable installed</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 14 -->
+<div class="step">
+  <div class="step-num">14</div>
+  <div class="step-body">
+    <h3>Connect the USB-C cable to the ESP32</h3>
+    <p>The USB-C port is on the ESP32 board mounted on the PCB. Connect the cable from the bench to the ESP32.</p>
+    <div class="photo-row single">
+      <figure>
+        <img src="media/guide/hw-22.jpeg" alt="USB-C cable connected to ESP32">
+        <figcaption>USB-C cable connected to ESP32</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<!-- Step 15 -->
+<div class="step">
+  <div class="step-num">15</div>
+  <div class="step-body">
+    <h3>Connect USB-C to the PC, then turn on the power supply</h3>
+    <p>Plug the other end of the USB-C cable into the lab PC.</p>
+    <div class="note"><strong>Only now</strong> switch on the lab power supply. Powering the rig is always the <strong>final</strong> step.</div>
+    <div class="photo-row single">
+      <figure>
+        <img src="media/guide/hw-23.jpeg" alt="USB-C into PC — then turn on lab power">
+        <figcaption>USB into PC → then power supply ON (last step)</figcaption>
+      </figure>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!--  PART 2 — SOFTWARE GUIDE                           -->
+<!-- ═══════════════════════════════════════════════════ -->
+
+<div class="part-heading">
+  <span class="part-number">2</span>
+  <h2>Software Guide</h2>
+</div>
+
+<!-- SW Step 1 -->
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-body">
+    <h3>Launch the software</h3>
+    <p>Double-click the <strong>HEATSINK TESTER</strong> shortcut on the lab PC desktop. A browser tab opens automatically.</p>
+    <div class="photo-row">
+      <figure>
+        <img src="media/guide/sw-01.png" alt="Lab PC desktop with HEATSINK TESTER shortcut">
+        <figcaption>Find the HEATSINK TESTER shortcut on the desktop</figcaption>
+      </figure>
+      <figure>
+        <img src="media/guide/sw-02.png" alt="Close-up of HEATSINK TESTER icon">
+        <figcaption>Double-click this shortcut</figcaption>
+      </figure>
+    </div>
+    <figure class="screenshot">
+      <img src="media/guide/sw-03.png" alt="HeatsinkLab GUI open in browser — disconnected state">
+      <figcaption>The GUI opens at localhost:8765 — three setup sections are visible</figcaption>
+    </figure>
+  </div>
+</div>
+
+<!-- SW Step 2 -->
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-body">
+    <h3>Refresh the port list</h3>
+    <p>After plugging in the USB cable, click the <strong>⟳ refresh button</strong> next to the port dropdown. The ESP32 will appear as a new COM port in the list.</p>
+    <figure class="screenshot">
+      <img src="media/guide/sw-04.png" alt="Port row — refresh button highlighted">
+      <figcaption>Press ⟳ to refresh the COM port list</figcaption>
+    </figure>
+  </div>
+</div>
+
+<!-- SW Step 3 -->
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-body">
+    <h3>Select the COM port</h3>
+    <p>Open the port dropdown and select the entry labelled <strong>"COM3 — USB Serial Device"</strong>. The number may be different on your PC — pick the USB Serial Device entry.</p>
+    <figure class="screenshot">
+      <img src="media/guide/sw-05.png" alt="Port dropdown open — COM3 USB Serial Device highlighted">
+      <figcaption>Select the USB Serial Device entry (COM number may differ)</figcaption>
+    </figure>
+  </div>
+</div>
+
+<!-- SW Step 4 -->
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-body">
+    <h3>Click Connect</h3>
+    <p>With the COM port selected, click <strong>Connect</strong>. Wait a few seconds until the status shows:</p>
+    <div class="tip">✅ <strong>Connected - Device OK</strong> &nbsp;·&nbsp; <em>Device verified — ready to test.</em></div>
+    <figure class="screenshot">
+      <img src="media/guide/sw-06.png" alt="COM port selected — ready to connect">
+      <figcaption>COM3 selected — click Connect</figcaption>
+    </figure>
+    <figure class="screenshot">
+      <img src="media/guide/sw-07.png" alt="Device connected and verified — full wizard visible">
+      <figcaption>Green badge confirms connection — configure your test in sections 2 and 3 below</figcaption>
+    </figure>
+  </div>
+</div>
+
+<!-- SW Step 5 -->
+<div class="step">
+  <div class="step-num">5</div>
+  <div class="step-body">
+    <h3>Enter the Heatsink ID</h3>
+    <p>In the <strong>Heatsink ID</strong> field (section 2), type the code written on your heatsink sample — for example <code>HS-01-fin-array</code>. This label is saved in the results file so you can identify the data later.</p>
+    <p style="color:var(--muted);font-size:0.9rem;">Refer to the screenshot above — the Heatsink ID field is directly below the connection panel.</p>
+  </div>
+</div>
+
+<!-- SW Step 6 -->
+<div class="step">
+  <div class="step-num">6</div>
+  <div class="step-body">
+    <h3>Set the temperature range</h3>
+    <p>In the <strong>Test Configuration</strong> panel (section 3), enter:</p>
+    <table>
+      <tr><th>Field</th><th>Meaning</th><th>Example</th></tr>
+      <tr><td><strong>Start (°C)</strong></td><td>Lowest test temperature</td><td><code>40</code></td></tr>
+      <tr><td><strong>Stop (°C)</strong></td><td>Highest test temperature</td><td><code>80</code></td></tr>
+      <tr><td><strong>Step (°C)</strong></td><td>Gap between temperature steps</td><td><code>10</code></td></tr>
+    </table>
+    <p>The preview chips below the fields (e.g. <code>40°C  50°C  60°C  70°C  80°C</code>) show exactly which temperatures will be tested.</p>
+  </div>
+</div>
+
+<!-- SW Step 7 -->
+<div class="step">
+  <div class="step-num">7</div>
+  <div class="step-body">
+    <h3>Select wind speeds</h3>
+    <p>Tick the fan speed percentages to include in the test:</p>
+    <table>
+      <tr><th>Option</th><th>Meaning</th></tr>
+      <tr><td><strong>Fan OFF</strong></td><td>Natural convection — fan motor fully de-energised</td></tr>
+      <tr><td><strong>0 % … 100 %</strong></td><td>Forced convection at that fan speed</td></tr>
+    </table>
+    <p>You can tick multiple speeds — the system will run a full temperature sweep at each selected speed automatically.</p>
+  </div>
+</div>
+
+<!-- SW Step 8 -->
+<div class="step">
+  <div class="step-num">8</div>
+  <div class="step-body">
+    <h3>Start the test</h3>
+    <p>Click the large <strong>▶ START TEST</strong> button at the bottom of the page. The system takes over completely from this point.</p>
+    <p>A <strong>Test in Progress</strong> panel appears with live readouts:</p>
+    <table>
+      <tr><th>Display</th><th>Meaning</th></tr>
+      <tr><td>Temperature</td><td>Current heatsink base temperature (°C)</td></tr>
+      <tr><td>Setpoint</td><td>Target temperature the system is heating toward</td></tr>
+      <tr><td>Power (W)</td><td>Heater power consumption</td></tr>
+      <tr><td>Eq. PWM</td><td>Heater duty cycle converging to equilibrium</td></tr>
+      <tr><td>R_th (°C/W)</td><td>Thermal resistance — lower is better cooling</td></tr>
+    </table>
+    <figure class="screenshot">
+      <img src="media/guide/sw-08.png" alt="Test in progress — live data panel and chart">
+      <figcaption>Test running — watch the live panel and chart; do not touch anything</figcaption>
+    </figure>
+  </div>
+</div>
+
+<!-- SW Step 9 -->
+<div class="step">
+  <div class="step-num">9</div>
+  <div class="step-body">
+    <h3>Wait — do not touch anything</h3>
+    <p>The system works through each temperature step automatically:</p>
+    <ol style="padding-left:1.4rem;color:#374151;">
+      <li style="margin-bottom:0.3rem;">Heats to the target temperature</li>
+      <li style="margin-bottom:0.3rem;">Waits until temperature is stable (±0.5 °C)</li>
+      <li style="margin-bottom:0.3rem;">Holds for the soak period</li>
+      <li style="margin-bottom:0.3rem;">Records the result</li>
+      <li>Moves to the next step automatically</li>
+    </ol>
+    <div class="note">Typical test duration: <strong>10–30 minutes</strong> depending on the number of steps and fan speeds selected.</div>
+  </div>
+</div>
+
+<!-- SW Step 10 -->
+<div class="step">
+  <div class="step-num">10</div>
+  <div class="step-body">
+    <h3>Download the results</h3>
+    <p>When all steps are complete, a <strong>Results</strong> table appears at the bottom of the page. Click <strong>↓ Results CSV</strong> to save the summary to your PC.</p>
+    <div class="tip">Also click <strong>↓ Raw CSV</strong> if your instructor asks for the full telemetry log.</div>
+    <figure class="screenshot">
+      <img src="media/guide/sw-09.png" alt="Results table with Results CSV and Raw CSV buttons">
+      <figcaption>Results table — click ↓ Results CSV to download</figcaption>
+    </figure>
+  </div>
+</div>
+
+<!-- SW Step 11 -->
+<div class="step">
+  <div class="step-num">11</div>
+  <div class="step-body">
+    <h3>Remove heatsink and repeat</h3>
+    <ol style="padding-left:1.4rem;color:#374151;">
+      <li style="margin-bottom:0.4rem;">Wait for the temperature readout to drop below <strong>35 °C</strong> before handling any components.</li>
+      <li style="margin-bottom:0.4rem;">Unclip the tested heatsink from the copper plate.</li>
+      <li style="margin-bottom:0.4rem;">Mount the next heatsink (back to Part 1, Step 1).</li>
+      <li>Return to <strong>Part 2, Step 5</strong> — enter the new Heatsink ID and start the next test.</li>
+    </ol>
+    <div class="note">Do <strong>not</strong> disconnect the USB or restart the software between back-to-back tests in the same session.</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!--  TROUBLESHOOTING                                   -->
+<!-- ═══════════════════════════════════════════════════ -->
+
+<div class="troubleshoot-section">
+  <h2>🔧 Troubleshooting</h2>
+  <table>
+    <tr><th>Symptom</th><th>What to try</th></tr>
+    <tr>
+      <td>COM port doesn't appear in the dropdown after plugging in USB</td>
+      <td>Press the <strong>⟳ refresh</strong> button; try a different USB port on the PC</td>
+    </tr>
+    <tr>
+      <td>"Connecting…" hangs indefinitely</td>
+      <td>Unplug and replug the USB cable; close and reopen the browser tab</td>
+    </tr>
+    <tr>
+      <td>Temperature reads 0 °C</td>
+      <td>Check the thermocouple plug is fully seated in the PCB connector</td>
+    </tr>
+    <tr>
+      <td>Power reads 0 W</td>
+      <td>Check the heater plate cable connector on the PCB</td>
+    </tr>
+    <tr>
+      <td>Pressure reads nothing</td>
+      <td>Check the P1 cable at both ends — white tape must align on both connectors</td>
+    </tr>
+    <tr>
+      <td>R_th shows NaN</td>
+      <td>Power reading is 0 (divide by zero) — see "Power reads 0 W" above</td>
+    </tr>
+    <tr>
+      <td>HEATSINK TESTER shortcut does nothing</td>
+      <td>Call the lab supervisor — the server may need to be restarted</td>
+    </tr>
+  </table>
+</div>
+
+</body>
+</html>
