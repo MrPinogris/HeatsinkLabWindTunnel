@@ -27,7 +27,7 @@ Traces made with copper tape. All peripherals connect via JST-XH plug-in connect
 │  │         (USB-C powered from lab PC)                 │           │
 │  │                                                     │           │
 │  │  GPIO4  ────────────────────────► Q1 GATE          │           │
-│  │  GPIO5  ───────────────────────────────────► [J5]  │           │
+│  │  GPIO5  ──────────────────────────────── [J4 pin3] │           │
 │  │  GPIO10 ────────────────────────► Q2 GATE          │           │
 │  │  GPIO11 (MISO) ─┐                                  │           │
 │  │  GPIO12 (CS)   ─┼──────────────────────────► [J6]  │           │
@@ -56,8 +56,7 @@ Traces made with copper tape. All peripherals connect via JST-XH plug-in connect
 | J1  | PWR_IN      | JST-XH 2p   | 2    | 12V+       | GND        | —           | —           | —         |
 | J2  | HEATER_OUT  | JST-XH 2p   | 2    | HEATER+    | HEATER−    | —           | —           | —         |
 | J3  | INA226_PWR  | *(on-board)* | —   | *(series in heater path — not a plug connector)* | | | | |
-| J4  | FAN_OUT     | JST-XH 2p   | 2    | FAN+       | FAN−       | —           | —           | —         |
-| J5  | FAN_PWM     | JST-XH 2p   | 2    | GPIO5      | GND        | —           | —           | —         |
+| J4  | FAN         | JST-XH 3p   | 3    | FAN+ (12V via Q2) | GND  | GPIO5(PWM)  | —           | —         |
 | J6  | THERMO      | JST-XH 5p   | 5    | 3.3V       | GND        | GPIO11(MISO)| GPIO12(CS)  | GPIO13(SCK)|
 | J7  | INA226_I2C  | JST-XH 4p   | 4    | 3.3V       | GND        | GPIO15(SDA) | GPIO16(SCL) | —         |
 | J8  | SDP510      | JST-XH 4p   | 4    | 3.3V       | GND        | GPIO15(SDA) | GPIO16(SCL) | —         |
@@ -98,8 +97,8 @@ J1 pin 1 (12V+)
     J4 pin 2 (FAN−) ──► fan (−) ──► GND rail
 Q2 SOURCE ──► GND rail
 
-J5 pin 1 (GPIO5) ──► fan PWM signal wire (if fan has separate PWM input)
-J5 pin 2 (GND)
+J4 pin 3 (GPIO5) ──► fan PWM signal wire (if fan has separate PWM input)
+J4 pin 2 (GND)
 ```
 
 > If your fan is a simple 2-wire brushless (12V / GND only with no PWM input), GPIO5 drives Q2 as a second PWM switch and GPIO10 is unused. If the fan has a separate PWM input (3- or 4-wire fan), GPIO5 goes to the PWM pin and Q2 is just the power switch driven by GPIO10.
@@ -135,7 +134,7 @@ I2C addresses (no conflicts):
 | ESP32-S3 GPIO | Signal         | Goes to             |
 |---------------|----------------|---------------------|
 | GPIO 4        | Heater PWM     | Q1 gate (on-board)  |
-| GPIO 5        | Fan PWM        | J5 pin 1            |
+| GPIO 5        | Fan PWM        | J4 pin 3            |
 | GPIO 10       | Fan power EN   | Q2 gate (on-board)  |
 | GPIO 11       | SPI MISO       | J6 pin 3            |
 | GPIO 12       | SPI CS         | J6 pin 4            |
@@ -173,8 +172,7 @@ I2C addresses (no conflicts):
 | 2   | 10kΩ resistor                | MOSFET gate pull-downs                     |
 | 1   | JST-XH 2-pin connector pair  | J1 PWR_IN                                  |
 | 1   | JST-XH 2-pin connector pair  | J2 HEATER_OUT                              |
-| 1   | JST-XH 2-pin connector pair  | J4 FAN_OUT                                 |
-| 1   | JST-XH 2-pin connector pair  | J5 FAN_PWM                                 |
+| 1   | JST-XH 3-pin connector pair  | J4 FAN (12V / GND / PWM)                   |
 | 1   | JST-XH 5-pin connector pair  | J6 THERMO (MAX6675 SPI)                    |
 | 3   | JST-XH 4-pin connector pair  | J7 INA226_I2C, J8 SDP510, J9 EZO_HUM      |
 | 1   | JST-XH 4-pin connector pair  | J10 EXT1 (future sensor)                   |
