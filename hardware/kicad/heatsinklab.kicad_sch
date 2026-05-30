@@ -1,7 +1,7 @@
 (kicad_sch
-  (version 20231120)
+  (version 20240101)
   (generator "heatsinklab-manual")
-  (generator_version "8.0")
+  (generator_version "9.0")
   (paper "A3")
   (title_block
     (title "HeatsinkLab Wind Tunnel — Carrier Board")
@@ -11,7 +11,6 @@
   )
 
   (lib_symbols
-    ;; ── Generic connector symbols ──────────────────────────────────────
     (symbol "Connector_Generic:Conn_01x02"
       (pin_names (offset 1.016) hide)
       (exclude_from_sim no) (in_bom yes) (on_board yes)
@@ -56,7 +55,6 @@
         (pin passive line (at -2.54 -5.08 0) (length 1.27) (name "Pin_5" (effects (font (size 1.016 1.016)))) (number "5" (effects (font (size 1.016 1.016)))))
       )
     )
-    ;; ── N-channel MOSFET ──────────────────────────────────────────────
     (symbol "Device:IRLZ44N"
       (pin_names (offset 1.016))
       (exclude_from_sim no) (in_bom yes) (on_board yes)
@@ -65,13 +63,11 @@
       (property "Footprint" "Package_TO_SOT_THT:TO-220-3_Vertical" (at 5.08 -3.81 0) (effects (font (size 1.27 1.27)) hide))
       (property "Datasheet" "https://www.infineon.com/dgdl/irlz44npbf.pdf" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
       (symbol "IRLZ44N_0_1"
-        ;; body
         (polyline (pts (xy 0 0) (xy 2.54 0)) (stroke (width 0) (type default)) (fill (type none)))
         (polyline (pts (xy 2.54 -2.54) (xy 2.54 2.54)) (stroke (width 0.254) (type default)) (fill (type none)))
         (polyline (pts (xy 2.54  1.016) (xy 3.81  1.016) (xy 3.81  2.54) (xy 6.35  2.54)) (stroke (width 0) (type default)) (fill (type none)))
         (polyline (pts (xy 2.54 -1.016) (xy 3.81 -1.016) (xy 3.81 -2.54) (xy 6.35 -2.54)) (stroke (width 0) (type default)) (fill (type none)))
         (polyline (pts (xy 3.81  0) (xy 6.35  0)) (stroke (width 0) (type default)) (fill (type none)))
-        ;; arrow (drain arrow for N-ch)
         (polyline (pts (xy 4.572 -0.508) (xy 3.81 0) (xy 4.572 0.508)) (stroke (width 0) (type default)) (fill (type outline)))
         (circle (center 2.032 0) (radius 2.8194) (stroke (width 0.254) (type default)) (fill (type none)))
       )
@@ -81,7 +77,6 @@
         (pin passive line (at 6.35 -2.54 90) (length 2.54) (name "S" (effects (font (size 1.016 1.016)))) (number "3" (effects (font (size 1.016 1.016)))))
       )
     )
-    ;; ── Resistor ──────────────────────────────────────────────────────
     (symbol "Device:R"
       (pin_names (offset 0) hide)
       (exclude_from_sim no) (in_bom yes) (on_board yes)
@@ -97,7 +92,6 @@
         (pin passive line (at 0 -3.81  90) (length 1.27) (name "~" (effects (font (size 1.016 1.016)))) (number "2" (effects (font (size 1.016 1.016)))))
       )
     )
-    ;; ── Power symbols ─────────────────────────────────────────────────
     (symbol "power:GND"
       (pin_names (offset 0) hide) (exclude_from_sim no) (in_bom yes) (on_board yes)
       (property "Reference" "#PWR" (at 0 -3.81 0) (effects (font (size 1.27 1.27)) hide))
@@ -144,11 +138,7 @@
     )
   )
 
-  ;; ════════════════════════════════════════════════════════════════════
-  ;; SHEET INSTANCES
-  ;; ════════════════════════════════════════════════════════════════════
 
-  ;; ── J1: Power Input (2-pin JST-XH) ──────────────────────────────────
   (symbol (lib_id "Connector_Generic:Conn_01x02") (at 20 20 0) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "j1-pwr-in")
@@ -159,7 +149,6 @@
     (pin "2" (uuid "j1-pin2"))
   )
 
-  ;; ── J2: Heater Output (2-pin JST-XH) ────────────────────────────────
   (symbol (lib_id "Connector_Generic:Conn_01x02") (at 20 35 0) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "j2-heater-out")
@@ -170,7 +159,6 @@
     (pin "2" (uuid "j2-pin2"))
   )
 
-  ;; ── J4: Fan Output (2-pin JST-XH) ───────────────────────────────────
   (symbol (lib_id "Connector_Generic:Conn_01x02") (at 20 50 0) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "j4-fan-out")
@@ -181,7 +169,6 @@
     (pin "2" (uuid "j4-pin2"))
   )
 
-  ;; ── J5: Fan PWM signal (2-pin JST-XH) ───────────────────────────────
   (symbol (lib_id "Connector_Generic:Conn_01x02") (at 20 65 0) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "j5-fan-pwm")
@@ -192,7 +179,6 @@
     (pin "2" (uuid "j5-pin2"))
   )
 
-  ;; ── J6: Thermocouple SPI (5-pin JST-XH) ─────────────────────────────
   (symbol (lib_id "Connector_Generic:Conn_01x05") (at 160 20 0) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "j6-thermo")
@@ -206,7 +192,6 @@
     (pin "5" (uuid "j6-pin5"))
   )
 
-  ;; ── J7: INA226 I2C (4-pin JST-XH) ───────────────────────────────────
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 160 50 0) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "j7-ina226")
@@ -219,7 +204,6 @@
     (pin "4" (uuid "j7-pin4"))
   )
 
-  ;; ── J8: SDP510 Differential Pressure (4-pin JST-XH) ─────────────────
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 160 70 0) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "j8-sdp510")
@@ -232,7 +216,6 @@
     (pin "4" (uuid "j8-pin4"))
   )
 
-  ;; ── J9: EZO-HUM Humidity (4-pin JST-XH) ─────────────────────────────
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 160 90 0) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "j9-ezohum")
@@ -245,7 +228,6 @@
     (pin "4" (uuid "j9-pin4"))
   )
 
-  ;; ── J10: EXT1 Future sensor (4-pin JST-XH) ──────────────────────────
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 160 110 0) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "j10-ext1")
@@ -258,7 +240,6 @@
     (pin "4" (uuid "j10-pin4"))
   )
 
-  ;; ── ESP32-S3 Header (26-pin, 2 rows of 13) as two 13-pin connectors ─
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 90 20 0) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "esp-gpio-sig")
@@ -294,7 +275,6 @@
     (pin "4" (uuid "esp-gnd-i2c"))
   )
 
-  ;; ── Q1: Heater MOSFET IRLZ44N ────────────────────────────────────────
   (symbol (lib_id "Device:IRLZ44N") (at 55 30 0) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "q1-heater-mosfet")
@@ -306,7 +286,6 @@
     (pin "3" (uuid "q1-source"))
   )
 
-  ;; ── Q2: Fan MOSFET IRLZ44N ───────────────────────────────────────────
   (symbol (lib_id "Device:IRLZ44N") (at 55 55 0) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "q2-fan-mosfet")
@@ -318,7 +297,6 @@
     (pin "3" (uuid "q2-source"))
   )
 
-  ;; ── R1: I2C SDA pull-up 4.7k ─────────────────────────────────────────
   (symbol (lib_id "Device:R") (at 135 65 90) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "r1-sda-pullup")
@@ -329,7 +307,6 @@
     (pin "2" (uuid "r1-pin2"))
   )
 
-  ;; ── R2: I2C SCL pull-up 4.7k ─────────────────────────────────────────
   (symbol (lib_id "Device:R") (at 135 75 90) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "r2-scl-pullup")
@@ -340,7 +317,6 @@
     (pin "2" (uuid "r2-pin2"))
   )
 
-  ;; ── R3: Q1 gate pull-down 10k ────────────────────────────────────────
   (symbol (lib_id "Device:R") (at 48 30 90) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "r3-q1-pulldown")
@@ -351,7 +327,6 @@
     (pin "2" (uuid "r3-pin2"))
   )
 
-  ;; ── R4: Q2 gate pull-down 10k ────────────────────────────────────────
   (symbol (lib_id "Device:R") (at 48 55 90) (unit 1)
     (exclude_from_sim no) (in_bom yes) (on_board yes)
     (uuid "r4-q2-pulldown")
@@ -362,9 +337,6 @@
     (pin "2" (uuid "r4-pin2"))
   )
 
-  ;; ════════════════════════════════════════════════════════════════════
-  ;; POWER SYMBOLS
-  ;; ════════════════════════════════════════════════════════════════════
   (symbol (lib_id "power:+12V") (at 20 17 0) (unit 1) (uuid "pwr12v-j1") (property "Reference" "#PWR01" (at 0 0 0) (effects (font (size 1.27 1.27)) hide)) (property "Value" "+12V" (at 20 14.5 0) (effects (font (size 1.27 1.27)))) (pin "1" (uuid "pwr12v-j1-p")))
   (symbol (lib_id "power:GND") (at 20 23.54 0) (unit 1) (uuid "gnd-j1") (property "Reference" "#PWR02" (at 0 0 0) (effects (font (size 1.27 1.27)) hide)) (property "Value" "GND" (at 20 26.04 0) (effects (font (size 1.27 1.27)))) (pin "1" (uuid "gnd-j1-p")))
   (symbol (lib_id "power:+12V") (at 61.35 27.46 0) (unit 1) (uuid "pwr12v-q1d") (property "Reference" "#PWR03" (at 0 0 0) (effects (font (size 1.27 1.27)) hide)) (property "Value" "+12V" (at 61.35 25.0 0) (effects (font (size 1.27 1.27)))) (pin "1" (uuid "pwr12v-q1d-p")))
@@ -389,9 +361,6 @@
   (symbol (lib_id "power:+3.3V") (at 131.46 62.0 0) (unit 1) (uuid "3v3-r1") (property "Reference" "#PWR22" (at 0 0 0) (effects (font (size 1.27 1.27)) hide)) (property "Value" "+3.3V" (at 131.46 59.5 0) (effects (font (size 1.27 1.27)))) (pin "1" (uuid "3v3-r1-p")))
   (symbol (lib_id "power:+3.3V") (at 131.46 72.0 0) (unit 1) (uuid "3v3-r2") (property "Reference" "#PWR23" (at 0 0 0) (effects (font (size 1.27 1.27)) hide)) (property "Value" "+3.3V" (at 131.46 69.5 0) (effects (font (size 1.27 1.27)))) (pin "1" (uuid "3v3-r2-p")))
 
-  ;; ════════════════════════════════════════════════════════════════════
-  ;; NET LABELS (named nets connecting distant pins)
-  ;; ════════════════════════════════════════════════════════════════════
   (net_label "GPIO4_HEAT"  (at 87.38 20    0) (fields_autoplaced yes) (uuid "lbl-gpio4-esp")  (property "Value" "GPIO4_HEAT"  (at 87.38 20    0) (effects (font (size 1.27 1.27)) (justify right))))
   (net_label "GPIO4_HEAT"  (at 55    30    180) (fields_autoplaced yes) (uuid "lbl-gpio4-q1") (property "Value" "GPIO4_HEAT"  (at 55    30    0) (effects (font (size 1.27 1.27)) (justify left))))
   (net_label "GPIO5_FPWM"  (at 87.38 22.54 0) (fields_autoplaced yes) (uuid "lbl-gpio5-esp") (property "Value" "GPIO5_FPWM"  (at 87.38 22.54 0) (effects (font (size 1.27 1.27)) (justify right))))
@@ -419,27 +388,16 @@
   (net_label "FAN_OUT_P"  (at 17.46 50    0) (fields_autoplaced yes) (uuid "lbl-fanp-j4")   (property "Value" "FAN_OUT_P"  (at 17.46 50    0) (effects (font (size 1.27 1.27)) (justify right))))
   (net_label "FAN_OUT_P"  (at 61.35 55    270) (fields_autoplaced yes) (uuid "lbl-fanp-q2d") (property "Value" "FAN_OUT_P"  (at 61.35 55    0) (effects (font (size 1.27 1.27)))))
 
-  ;; ════════════════════════════════════════════════════════════════════
-  ;; WIRES (local short connections)
-  ;; ════════════════════════════════════════════════════════════════════
-  ;; J1 power in → power symbols
   (wire (pts (xy 17.46 20) (xy 20 20)))
   (wire (pts (xy 17.46 22.54) (xy 20 22.54)))
-  ;; Q1 gate ← R3 (pull-down)
   (wire (pts (xy 44.46 30) (xy 55 30)))
   (wire (pts (xy 44.46 30) (xy 44.46 33.54)))
-  ;; Q2 gate ← R4 (pull-down)
   (wire (pts (xy 44.46 55) (xy 55 55)))
   (wire (pts (xy 44.46 55) (xy 44.46 58.54)))
-  ;; J2 HEATER GND
   (wire (pts (xy 17.46 37.54) (xy 20 37.54)))
-  ;; J4 FAN GND
   (wire (pts (xy 17.46 52.54) (xy 20 52.54)))
-  ;; J5 FAN_PWM GND
   (wire (pts (xy 17.46 67.54) (xy 20 67.54)))
-  ;; R1 SDA pull-up top to 3V3
   (wire (pts (xy 131.46 62) (xy 135 61.19)))
-  ;; R2 SCL pull-up top to 3V3
   (wire (pts (xy 131.46 72) (xy 135 71.19)))
 
   (sheet_instances
