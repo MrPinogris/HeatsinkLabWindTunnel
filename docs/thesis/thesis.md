@@ -5,8 +5,8 @@
 ---
 
 **Author:** Alexander Groenvynck
-**Programme:** _[Bachelor of Engineering — Electronics / Mechatronics / Mechanical]_
-**Institution:** University of Girona
+**Programme:** Bachelor in Energy Technology (Odisee University of Applied Sciences, Ghent)
+**Host institution:** University of Girona (exchange)
 **Supervisor:** Lino Montoro Moreno
 **Academic year:** 2025–2026
 
