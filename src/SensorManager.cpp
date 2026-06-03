@@ -1,4 +1,5 @@
 #include "SensorManager.h"
+#include "SystemState.h"
 #include "max6675.h"
 #include "INA226.h"
 #include <Wire.h>
@@ -190,7 +191,7 @@ CoreSensorData SensorManager::read() {
 
 bool SensorManager::isValidTemp(float t) const {
     if (isnan(t)) return false;
-    if (t < -20.0f || t > 400.0f) return false;
+    if (t < -20.0f || t > SP_MAX_C) return false;
     return true;
 }
 
