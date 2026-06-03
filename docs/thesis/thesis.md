@@ -563,18 +563,23 @@ continuously to disk throughout the test.
 
 | Heatsink | Fan % | SP (°C) | Actual T (°C) | T_amb (°C) | ΔT (°C) | P (W) | EqPWM | R_th (°C/W) |
 |---|---|---|---|---|---|---|---|---|
-| HS-01-aluminium-fin | 50 | 40 | 40.2 | 22.1 | 18.1 | 5.8 | 74 | 3.12 |
-| HS-01-aluminium-fin | 50 | 50 | 50.3 | 22.2 | 28.1 | 8.9 | 112 | 3.16 |
-| HS-01-aluminium-fin | 50 | 60 | 60.1 | 22.2 | 37.9 | 12.1 | 151 | 3.13 |
-| HS-02-copper-block | 50 | 40 | 40.1 | 22.3 | 17.8 | 7.4 | 93 | 2.41 |
-| HS-02-copper-block | 50 | 50 | 50.2 | 22.3 | 27.9 | 11.6 | 145 | 2.41 |
-| HS-02-copper-block | 50 | 60 | 60.0 | 22.3 | 37.7 | 15.7 | 196 | 2.40 |
+| HS-01-aluminium-fin | 50 | 40 | 40.2 | 22.1 | 18.1 | 7.6 | 95 | 2.38 |
+| HS-01-aluminium-fin | 50 | 50 | 50.3 | 22.2 | 28.1 | 11.6 | 145 | 2.42 |
+| HS-01-aluminium-fin | 50 | 60 | 60.1 | 22.2 | 37.9 | 15.9 | 199 | 2.38 |
+| HS-02-copper-block | 50 | 40 | 40.1 | 22.3 | 17.8 | 4.4 | 55 | 4.05 |
+| HS-02-copper-block | 50 | 50 | 50.2 | 22.3 | 27.9 | 7.0 | 88 | 3.99 |
+| HS-02-copper-block | 50 | 60 | 60.0 | 22.3 | 37.7 | 9.5 | 119 | 3.97 |
 
 The table illustrates the expected output format. R_th is consistent across set-points
 for a given heatsink - consistent with the theoretical expectation that R_th is a
 material/geometry property independent of operating point - and the platform clearly
-distinguishes the two samples (HS-01 ≈ 3.1 °C/W vs. HS-02 ≈ 2.4 °C/W in this
-example).
+distinguishes the two samples (HS-01 ≈ 2.4 °C/W vs. HS-02 ≈ 4.0 °C/W in this example).
+Note that the finned aluminium heatsink (HS-01) outperforms the plain copper block
+(HS-02) despite copper's higher thermal conductivity: the fins provide far more
+convective surface area, which dominates the result under forced airflow. This also
+explains why HS-01 draws more heater power and a higher equilibrium PWM to hold the
+same temperature - a better heatsink sheds heat more readily, so more power is needed
+to keep the copper plate at the set-point.
 
 ### 4.6 Safety shutdown verification
 
