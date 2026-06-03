@@ -384,7 +384,7 @@ sends `SET`/`GET` commands and receives one telemetry line per control cycle.
 
 | Command | Range | Description |
 |---|---|---|
-| `SET SP <f>` | −20…400 °C | Temperature set-point |
+| `SET SP <f>` | −20…200 °C | Temperature set-point (ceiling defined by `SP_MAX_C` in firmware) |
 | `SET MODE <m>` | AUTO / MANUAL / SMART | Control mode |
 | `SET FAN <n>` | 0…100 | Fan speed % |
 | `SET RUN <ON/OFF>` | ON / OFF | Enable / disable heater |
@@ -392,8 +392,12 @@ sends `SET`/`GET` commands and receives one telemetry line per control cycle.
 | `GET` | — | Print current configuration |
 
 All parameters are bounds-checked in firmware before acceptance. The maximum
-temperature set-point is capped at 400 °C; the heater GPIO and maximum PWM slew rate
-are fixed and never changed by software.
+temperature set-point is capped at **200 °C** — the present electronics (heater
+MOSFET, wiring, and INA226 shunt) are not rated for the sustained power output that
+would be required to hold higher temperatures reliably. The ceiling is defined as a
+single constant (`SP_MAX_C`) in `SystemState.h`; every bounds-check in the codebase
+uses that constant, so raising the limit for future hardware requires changing one
+line. The heater GPIO and maximum PWM slew rate are fixed and never changed by software.
 
 ### 3.7 Control strategy
 

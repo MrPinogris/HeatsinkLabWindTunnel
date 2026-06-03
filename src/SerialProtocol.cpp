@@ -50,7 +50,7 @@ void SerialProtocol::loadConfig() {
     sys.pidKd       = prefs.getFloat("kd",       sys.pidKd);
     sys.pidBias     = constrain(prefs.getFloat("bias",   sys.pidBias),    -255.0f, 255.0f);
     sys.setpointBias= constrain(prefs.getFloat("spbias", sys.setpointBias),-200.0f, 200.0f);
-    sys.setpoint    = constrain(prefs.getFloat("sp",     sys.setpoint),    -20.0f, 400.0f);
+    sys.setpoint    = constrain(prefs.getFloat("sp",     sys.setpoint),    -20.0f, SP_MAX_C);
     sys.emaAlpha    = constrain(prefs.getFloat("alpha",  sys.emaAlpha),    0.001f,   1.0f);
     sys.maxPwmStep  = constrain(prefs.getInt  ("maxstep",sys.maxPwmStep),      0,    255);
     sys.smartEnterCount = (uint16_t)constrain(prefs.getInt("entcnt", sys.smartEnterCount), 1, 400);
@@ -122,7 +122,7 @@ void SerialProtocol::emitTelemetry(const CoreSensorData &s,
                                    int pwm,
                                    float pTerm, float iTerm, float dTerm, float pidOut,
                                    const char *stateText) {
-    float effectiveSetpoint = constrain(sys.setpoint + sys.setpointBias, -20.0f, 400.0f);
+    float effectiveSetpoint = constrain(sys.setpoint + sys.setpointBias, -20.0f, SP_MAX_C);
     float absError = fabsf(effectiveSetpoint - s.smoothTemp);
 
     Serial.printf(
@@ -306,7 +306,7 @@ static void handleCommand(char *line) {
         sys.setpointBias = value;
         Serial.printf("OK SPBIAS set to %.2f\n", sys.setpointBias);
     } else if (strcmp(key, "SP") == 0) {
-        if (value < -20.0f || value > 400.0f) { Serial.println("ERR SP must be in range -20..400"); return; }
+        if (value < -20.0f || value > SP_MAX_C) { Serial.printf("ERR SP must be in range -20..%.0f\n", SP_MAX_C); return; }
         sys.setpoint = value;
         Serial.printf("OK SP set to %.2f\n", sys.setpoint);
     } else if (strcmp(key, "ALPHA") == 0) {

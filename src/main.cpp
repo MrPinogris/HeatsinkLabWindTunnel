@@ -199,7 +199,7 @@ void setup() {
     // ─────────────────────────────────────────────────────────────────────
 
     Serial.println("System started");
-    Serial.println("Commands: GET, SET KP <v>, SET KI <v>, SET KD <v>, SET BIAS <v>, SET SPBIAS <v>, SET SP <v>, SET ALPHA <v>, SET MAXSTEP <v>, SET ENTERCNT <1..400>, SET EXITCNT <1..400>, SET FAN <0..100>, SET FANINV <0|1>, SET FANPWR <ON|OFF>, SET MODE <AUTO|MANUAL|SMART>, SET MANPWM <0..255>, SET RUN <ON|OFF>");
+    Serial.printf("Commands: GET, SET KP <v>, SET KI <v>, SET KD <v>, SET BIAS <v>, SET SPBIAS <v>, SET SP <-20..%.0f>, SET ALPHA <v>, SET MAXSTEP <v>, SET ENTERCNT <1..400>, SET EXITCNT <1..400>, SET FAN <0..100>, SET FANINV <0|1>, SET FANPWR <ON|OFF>, SET MODE <AUTO|MANUAL|SMART>, SET MANPWM <0..255>, SET RUN <ON|OFF>\n", SP_MAX_C);
     SerialProtocol::printConfig();
 }
 
@@ -250,7 +250,7 @@ void loop() {
     }
 
     // ── Derived quantities ────────────────────────────────────────────────
-    float effectiveSetpoint = constrain(sys.setpoint + sys.setpointBias, -20.0f, 400.0f);
+    float effectiveSetpoint = constrain(sys.setpoint + sys.setpointBias, -20.0f, SP_MAX_C);
     float error             = effectiveSetpoint - sd.smoothTemp;
     float absError          = fabsf(error);
     float absErrorMinusAcc  = max(0.0f, absError - THERMOCOUPLE_ACCURACY_C);

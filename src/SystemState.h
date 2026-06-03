@@ -3,6 +3,17 @@
 
 #include <Arduino.h>
 
+// ── Setpoint safety ceiling ────────────────────────────────────────────────────
+// Maximum temperature the firmware will accept via SET SP.
+// Current limit: 200 °C — safe for the present electronics (heater MOSFET,
+// wiring, and INA226 shunt are not rated for the power output required to
+// hold higher temperatures continuously).
+//
+// To raise the limit after a hardware upgrade, change SP_MAX_C here.
+// Every bounds-check in SerialProtocol.cpp, SensorManager.cpp, and main.cpp
+// uses this constant, so one edit is all that is needed.
+#define SP_MAX_C  200.0f
+
 // ── Control modes ──────────────────────────────────────────────────────────────
 enum ControlMode {
     MODE_AUTO   = 0,  // PID continuously drives heater toward setpoint
