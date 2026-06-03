@@ -69,8 +69,6 @@ and testing described in this thesis was carried out by me on the physical appar
 This text was written by me; AI assistance used in drafting was reviewed and verified
 for accuracy.
 
-> _[Adjust the wording above to match your institution's exact AI-disclosure policy.]_
-
 ---
 
 ## Table of Contents
@@ -126,7 +124,7 @@ for accuracy.
 | T_amb | Ambient temperature | °C |
 | ΔT | Temperature rise above ambient, T - T_amb | °C |
 | P | Electrical power dissipated in the heater | W |
-| R_th | Thermal resistance, ΔT ⁄ P | °C/W |
+| R_th | Thermal resistance, ΔT / P | °C/W |
 | PWM | Pulse-width-modulated heater drive (0-255) | - |
 | EqPWM | Equilibrium PWM estimate (steady-state) | - |
 | PID | Proportional-Integral-Derivative controller | - |
@@ -168,7 +166,7 @@ Two concepts underpin the whole project.
 resistance, defined as the temperature rise above ambient per unit of dissipated
 power:
 
-> R_th = ΔT ⁄ P   (°C/W),  where ΔT = T - T_amb.
+> R_th = ΔT / P   (°C/W),  where ΔT = T - T_amb.
 
 A lower R_th means heat is carried away more effectively, i.e. a better heatsink. For
 the comparison to be fair, the airflow over the heatsink must be the same for every
@@ -350,7 +348,7 @@ All switching and sensing electronics are mounted on a perfboard dev board house
 a compartment at the base of the tunnel (Figures 3.6-3.7). The ESP32-S3 DevKit-C1
 occupies the centre of the board; MOSFET modules for the heater and fan are on the
 left; the INA226 power-monitor breakout board is to the right. Screw-terminal blocks
-accept the heater and fan power cables. Labelled JST connectors (P1, P2, M4…) provide
+accept the heater and fan power cables. Labelled JST connectors (P1, P2, M4, etc.) provide
 the sensor and fan motor connections.
 
 ![Dev board close-up](../media/guide/hw-17.jpeg)
@@ -393,9 +391,9 @@ sends `SET`/`GET` commands and receives one telemetry line per control cycle.
 
 | Command | Range | Description |
 |---|---|---|
-| `SET SP <f>` | -20…200 °C | Temperature set-point (ceiling defined by `SP_MAX_C` in firmware) |
+| `SET SP <f>` | -20 to 200 Â°C | Temperature set-point (ceiling defined by `SP_MAX_C` in firmware) |
 | `SET MODE <m>` | AUTO / MANUAL / SMART | Control mode |
-| `SET FAN <n>` | 0…100 | Fan speed % |
+| `SET FAN <n>` | 0 to 100 | Fan speed % |
 | `SET RUN <ON/OFF>` | ON / OFF | Enable / disable heater |
 | `SET KP/KI/KD <f>` | float | PID gains |
 | `GET` | - | Print current configuration |
@@ -444,7 +442,7 @@ state.
 
 ### 3.8 Thermal metric
 
-At each recorded operating point the backend computes R_th = ΔT ⁄ P (°C/W), as defined
+At each recorded operating point the backend computes R_th = ΔT / P (°C/W), as defined
 in Section 1.2. A lower value means a better heatsink. The metric is intentionally
 simple: the platform's purpose is *fair comparison between heatsinks under identical
 conditions*, for which a steady-state R_th at a controlled airflow is sufficient.
@@ -711,10 +709,6 @@ Drawn from the project's prioritised backlog, the highest-value next steps are:
 ---
 
 ## 8. References
-
-> _The references below are the component datasheets and software documentation
-> genuinely used to build the platform. Verify each URL and revision before
-> submission, and format them in your institution's required citation style._
 
 1. Espressif Systems, *ESP32-S3 Series Datasheet*, Espressif Systems (Shanghai) Co., Ltd. Available: https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
 2. Maxim Integrated, *MAX6675 - Cold-Junction-Compensated K-Thermocouple-to-Digital Converter (0°C to +1024°C)*, datasheet, Rev. 19-2235. Available: https://www.analog.com/media/en/technical-documentation/data-sheets/MAX6675.pdf
