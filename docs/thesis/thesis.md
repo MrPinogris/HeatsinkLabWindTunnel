@@ -728,7 +728,7 @@ Drawn from the project's prioritised backlog, the highest-value next steps are:
 | `SET KD <f>` | float | PID derivative gain |
 | `SET BIAS <f>` | −255 to 255 | PID output bias |
 | `SET SPBIAS <f>` | float | Set-point offset bias |
-| `SET SP <f>` | −20 to 400 °C | Temperature set-point |
+| `SET SP <f>` | −20 to 200 °C | Temperature set-point (ceiling defined by `SP_MAX_C` in firmware) |
 | `SET ALPHA <f>` | 0.001 to 1.0 | EMA filter coefficient |
 | `SET MAXSTEP <n>` | int | Maximum PWM change per cycle (slew-rate limit) |
 | `SET FAN <n>` | 0 to 100 | Fan speed % |
