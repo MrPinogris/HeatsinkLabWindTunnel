@@ -4,10 +4,10 @@
 
 ---
 
-**Author:** _[Your Name]_
+**Author:** Alexander Groenvynck
 **Programme:** _[Bachelor of Engineering — Electronics / Mechatronics / Mechanical]_
-**Institution:** _[University / Faculty / Department]_
-**Supervisor:** _[Supervisor name]_
+**Institution:** University of Girona
+**Supervisor:** Lino Montoro Moreno
 **Academic year:** 2025–2026
 
 ---
@@ -40,7 +40,17 @@ control, ESP32, embedded systems, instrumentation, laboratory automation.
 
 ## Acknowledgements
 
-_[Optional — thank your supervisor and anyone who helped with the physical build.]_
+I would like to thank my supervisor, **Lino Montoro Moreno**, for his guidance
+throughout this project and in particular for his hands-on help in the design and
+construction of the wind-tunnel enclosure.
+
+I also want to acknowledge two fellow students who contributed to the project.
+**Miquel Lladó i Tuñà** was involved from the early stages and helped build the
+heater module — specifically the copper spreader plate, the steel backing plate, and
+the insulation material beneath the heater element. **Esmeralda Solís** is continuing
+related work on the project by simulating the thermal behaviour and heat-flow
+properties of the heatsinks in Ansys Workbench, which will complement the
+experimental measurements this platform is designed to produce.
 
 ---
 
