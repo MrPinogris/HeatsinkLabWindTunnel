@@ -5,7 +5,6 @@
 ---
 
 **Author:** _[Your Name]_
-**Student number:** _[number]_
 **Programme:** _[Bachelor of Engineering — Electronics / Mechatronics / Mechanical]_
 **Institution:** _[University / Faculty / Department]_
 **Supervisor:** _[Supervisor name]_
