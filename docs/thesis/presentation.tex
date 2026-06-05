@@ -103,15 +103,14 @@
 \begin{frame}{The Problem}
   \begin{columns}[T]
     \column{0.55\textwidth}
-    \textbf{Measuring heatsink performance by hand is:}
+    \textbf{Manual heatsink testing is:}
     \begin{itemize}
-      \item \textbf{Slow} — you must hold a set temperature and wait for equilibrium
-      \item \textbf{Error-prone} — reading multiple instruments simultaneously
-      \item \textbf{Unsafe} — a live heater is always energised
-      \item \textbf{Cognitively expensive} — procedure overhead crowds out the learning objective
+      \item Slow
+      \item Error-prone
+      \item Unsafe — live heater
     \end{itemize}
-    \vspace{0.5em}
-    \textbf{Goal:} a system where the student presses \alert{one button} and walks away with a result CSV.
+    \vspace{1em}
+    \textbf{Goal:} \alert{one button} → results CSV.
     \column{0.42\textwidth}
     \centering
     \imgplaceholder[5.5cm]{Complete assembled system\\on the lab bench}
@@ -130,17 +129,13 @@
 %% ---- SLIDE 4: Research Questions ---------------------------
 \begin{frame}{Research Questions}
   \begin{enumerate}
-    \item[\textbf{RQ1}] Can a low-cost microcontroller hold a heat source at a series of
-          set-point temperatures with sufficient \alert{stability} for a repeatable measurement?
-    \vspace{0.4em}
-    \item[\textbf{RQ2}] Can thermal \alert{equilibrium be detected automatically}, removing
-          the need for an operator to judge when the system has settled?
-    \vspace{0.4em}
-    \item[\textbf{RQ3}] Can the complete test workflow be reduced to a \alert{single student
-          action} while guaranteeing safe shutdown of the heater under all termination conditions?
-    \vspace{0.4em}
-    \item[\textbf{RQ4}] Does the platform produce a comparative thermal metric that
-          \alert{meaningfully distinguishes} heatsinks of differing geometry and material?
+    \item[\textbf{RQ1}] Hold set-point temperatures with enough \alert{stability}?
+    \vspace{0.6em}
+    \item[\textbf{RQ2}] Detect thermal equilibrium \alert{automatically}?
+    \vspace{0.6em}
+    \item[\textbf{RQ3}] Reduce the workflow to a \alert{single action} + guarantee safe shutdown?
+    \vspace{0.6em}
+    \item[\textbf{RQ4}] Produce a metric that \alert{distinguishes heatsinks}?
   \end{enumerate}
   \note{These four research questions guided the whole project. RQ1 is about whether
   a cheap ESP32 microcontroller and a PID loop are good enough. RQ2 is the automation
@@ -190,15 +185,14 @@
   \begin{columns}[T]
     \column{0.5\textwidth}
     \begin{itemize}
-      \item Short rectangular enclosure — \textbf{chipboard panels}
-      \item Fan at one end drives forced-convection airflow
-      \item \textbf{Hexagonal honeycomb grid} immediately downstream of the fan
+      \item Chipboard enclosure, fan at one end
+      \item \textbf{Hexagonal honeycomb grid} after the fan
       \begin{itemize}
-        \item Breaks up rotational vortex flow from the fan blades
-        \item Produces a more \alert{uniform, laminar-like velocity profile} across the test section
-        \item Critical for fair heatsink comparison: every sample sees the same airflow
+        \item Breaks up fan swirl
+        \item \alert{Uniform, laminar-like flow}
+        \item → fair, repeatable comparison
       \end{itemize}
-      \item Heater module sits at the centre of the test section
+      \item Heater module at test-section centre
     \end{itemize}
     \column{0.47\textwidth}
     \centering
@@ -221,18 +215,16 @@
 \begin{frame}{The Heater Module}
   \begin{columns}[T]
     \column{0.52\textwidth}
-    \textbf{Stack (bottom to top):}
+    \textbf{Stack (bottom → top):}
     \begin{enumerate}
-      \item Insulation material — prevents heat loss downward
-      \item \textbf{Steel backing plate} — structural support
-      \item \textbf{Ceramic PTC heater element} — the heat source
-      \item \textbf{Copper spreader plate} — distributes heat uniformly
-      \item Heatsink under test — clipped on with a wire retaining clip
+      \item Insulation
+      \item Steel backing plate
+      \item \textbf{Ceramic PTC heater}
+      \item \textbf{Copper spreader plate}
+      \item Heatsink — wire clip
     \end{enumerate}
-    \vspace{0.4em}
-    \textbf{Thermocouple:} inserted into a precision-drilled hole in the copper plate
-    — tracks heatsink base temperature directly.\\[0.3em]
-    \textbf{Built with:} Miquel Lladó i Tuñà (copper plate, steel backing, insulation)
+    \vspace{0.6em}
+    \textbf{Thermocouple} in drilled hole in copper plate.
     \column{0.45\textwidth}
     \centering
     \includegraphics[width=\linewidth, height=3.6cm, keepaspectratio]{hw-01.jpeg}\\[0.3em]
@@ -256,17 +248,15 @@
 \begin{frame}{Electronics \& Sensors}
   \begin{columns}[T]
     \column{0.52\textwidth}
-    \textbf{Key components:}
     \begin{itemize}
-      \item \textbf{ESP32-S3 DevKit-C1} — microcontroller, runs firmware
-      \item \textbf{MAX6675} — K-type thermocouple-to-digital converter (SPI)
-      \item \textbf{INA226} — bi-directional current \& power monitor (I²C),\\
-            shunt in series with heater → measures dissipated power directly
-      \item \textbf{2× MOSFET modules} — switch heater (GPIO 4) and fan (GPIO 5)
-      \item \textbf{Eventek KPS3010D} — 12 V / 10 A lab bench PSU
+      \item \textbf{ESP32-S3} — runs firmware
+      \item \textbf{MAX6675} — thermocouple (SPI)
+      \item \textbf{INA226} — power monitor (I²C)
+      \item \textbf{2× MOSFETs} — heater + fan
+      \item \textbf{Eventek} — 12 V PSU
     \end{itemize}
-    \vspace{0.3em}
-    All electronics on a \textbf{perfboard dev board}, housed in the tunnel base.
+    \vspace{0.6em}
+    All on a \textbf{perfboard} in the tunnel base.
     \column{0.45\textwidth}
     \centering
     \includegraphics[width=\linewidth, height=3.6cm, keepaspectratio]{hw-17.jpeg}\\[0.3em]
@@ -288,34 +278,25 @@
 %% ---- SLIDE 9: Control Strategy: SMART Mode ----------------
 \begin{frame}{Control Strategy: SMART Mode}
   \begin{columns}[T]
-    \column{0.55\textwidth}
-    \textbf{Three firmware control modes:} AUTO · MANUAL · \alert{SMART}\\[0.6em]
-    \textbf{SMART mode — used for all automated tests:}
+    \column{0.52\textwidth}
+    \textbf{Modes:} AUTO · MANUAL · \alert{SMART}\\[0.8em]
+    \textbf{SMART (automated tests):}
     \begin{enumerate}
-      \item \textbf{PID drives} heater PWM toward set-point
-      \item Temperature filtered by \textbf{EMA} (exponential moving average)\\
-            + glitch rejection + stuck-sensor watchdog
-      \item When stable within \alert{±\,0.5\,°C for 8 consecutive seconds}:\\
-            enter \textbf{HOLD} — lock equilibrium PWM
-      \item Backend independently checks \textbf{EqPWM convergence}\\
-            (< 0.5 PWM units between frames) before recording
+      \item PID drives toward set-point
+      \item EMA filter on temperature
+      \item Stable \alert{±0.5\,°C / 8\,s} → \textbf{HOLD} (lock PWM)
+      \item Backend confirms EqPWM convergence
     \end{enumerate}
-    \vspace{0.3em}
+    \column{0.46\textwidth}
     \centering
-    \setlength{\fboxsep}{6pt}
+    \vspace{0.4em}
+    \setlength{\fboxsep}{8pt}
     \colorbox{hlblue!8}{%
       \small
-      \texttt{PID (drive)} $\;\longrightarrow^{\pm0.5\,°C\;/\;8\,s}\;$ \texttt{HOLD (locked PWM)}
-    }
-    \column{0.42\textwidth}
-    \vspace{0.5em}
-    \textbf{Why lock the PWM?}\\
-    At steady state, the equilibrium PWM directly tells us how much power the heater
-    is delivering. Combined with the INA226 current reading, this gives us the
-    dissipated power $P$ — which feeds directly into $R_{th} = \Delta T / P$.\\[0.6em]
-    \textbf{Why dual-check?}\\
-    Firmware stability band catches noise in the sensor. Backend EqPWM convergence
-    catches slow drift that passes the firmware test but isn't truly settled.
+      \texttt{PID} $\;\longrightarrow^{\pm0.5\,°C\,/\,8\,s}\;$ \texttt{HOLD}
+    }\\[1em]
+    \raggedright
+    \textbf{Locked PWM} = known steady-state power $P$ → feeds $R_{th} = \Delta T / P$.
   \end{columns}
   \note{SMART mode is the key control innovation in the firmware. It starts in PID
   mode — continuously adjusting heater power to drive the temperature toward the
@@ -341,23 +322,20 @@
     \]
     \normalsize
     \vspace{0.3em}
-    where $\Delta T = T_{heatsink} - T_{ambient}$\\
-    and $P$ = electrical power dissipated by the heater [W]
-    \vspace{0.8em}
+    $\Delta T = T - T_{amb}$, \quad $P$ = heater power [W]
+    \vspace{1em}
 
     \begin{itemize}
-      \item \textbf{Lower $R_{th}$} = heat removed more effectively = \alert{better heatsink}
-      \item Measured at multiple set-points — $R_{th}$ should be \textbf{constant} (material/geometry property)
-      \item Comparison is \textbf{fair} because airflow is identical for every heatsink tested
+      \item \alert{Lower $R_{th}$ = better heatsink}
+      \item Should be constant across set-points
+      \item Same airflow → fair comparison
     \end{itemize}
     \column{0.47\textwidth}
     \vspace{0.5em}
     \textbf{Intuition:}\\[0.4em]
-    A heatsink with \textbf{fins} has far more convective surface area than a plain block,
-    even if the plain block is made of copper (higher conductivity). Under forced airflow,
-    surface area dominates — so a finned aluminium heatsink typically outperforms a solid
-    copper block.\\[0.6em]
-    This is exactly what the results show.
+    More \textbf{fins} = more convective area.
+    Under forced airflow this beats raw conductivity —
+    finned aluminium $>$ solid copper.
   \end{columns}
   \note{The thermal metric is beautifully simple: temperature rise divided by power.
   If you put 10 watts into a heatsink and its temperature rises 30 degrees above ambient,
@@ -427,21 +405,18 @@
 \begin{frame}{Backend: \texttt{server.py}}
   \begin{columns}[T]
     \column{0.5\textwidth}
-    \textbf{Key responsibilities:}
+    \textbf{FastAPI / asyncio:}
     \begin{itemize}
-      \item \textbf{\texttt{\_serial\_reader()}} — async loop, reads one line at a time from the COM port at 115,200 baud
-      \item \textbf{\texttt{\_handle\_line()}} — applies \texttt{TELEM\_RE} (single regex) to extract all telemetry fields; calls \texttt{broadcast()}
-      \item \textbf{\texttt{broadcast()}} — pushes a JSON \texttt{"telemetry"} message to every connected WebSocket client
-      \item \textbf{\texttt{sendCmd()}} — sends \texttt{SET} / \texttt{GET} commands to the firmware
-      \item \textbf{CSV logger} — appends each frame to the raw log; \texttt{CSV\_FIELDS} + \texttt{schema\_version}
+      \item \texttt{\_serial\_reader()} — read serial
+      \item \texttt{\_handle\_line()} — parse \texttt{TELEM\_RE}
+      \item \texttt{broadcast()} — push WebSocket
+      \item \texttt{sendCmd()} — \texttt{SET} / \texttt{GET}
+      \item CSV logger (versioned schema)
     \end{itemize}
     \column{0.47\textwidth}
-    \textbf{Virtual MCU Simulator:}\\
-    Selecting the \texttt{VIRTUAL} port runs a software emulator that produces realistic telemetry — PID behaviour, equilibrium detection, ramp-up — with no hardware.\\[0.5em]
-    \alert{Used to develop and debug the entire tester workflow before the hardware existed.}\\[0.5em]
-    \textbf{WebSocket messages} (type field):\\
-    \texttt{"telemetry"} · \texttt{"ports"} · \texttt{"connected"}\\
-    \texttt{"disconnected"} · \texttt{"error"}
+    \textbf{Virtual MCU simulator}\\
+    \texttt{VIRTUAL} port emulates firmware.\\[0.4em]
+    \alert{Built \& tested the whole workflow before hardware existed.}
   \end{columns}
   \note{The backend is a single Python file — server.py — built with FastAPI and the
   asyncio event loop. The serial reader runs as a continuous async coroutine, reading
@@ -464,22 +439,18 @@
 \begin{frame}{Frontend: \texttt{index.html}}
   \begin{columns}[T]
     \column{0.52\textwidth}
-    \textbf{Single file — all HTML, CSS, and JavaScript}\\
-    (No build step, no Node.js, no internet required)\\[0.5em]
-    \textbf{WebSocket \texttt{onmessage} handler:}
+    \textbf{Single file — no build step}\\[0.6em]
+    \textbf{WebSocket handler:}
     \begin{itemize}
-      \item Receives \texttt{"telemetry"} every firmware cycle
-      \item Updates \textbf{Chart.js} live temperature trace
-      \item Updates sidebar readouts (temp, power, PWM, fan speed…)
+      \item Updates Chart.js + readouts
     \end{itemize}
     \vspace{0.4em}
-    \textbf{Tester state machine (JavaScript):}
+    \textbf{Tester state machine (JS):}
     \begin{itemize}
-      \item Steps through the programmed set-points
-      \item Watches \texttt{eq\_pwm} convergence on each telemetry frame
-      \item When converged: records a result row
-      \item Advances to next set-point — or ends test
-      \item Auto-downloads results CSV on completion
+      \item Steps through set-points
+      \item Waits for \texttt{eq\_pwm} convergence
+      \item Records row → next set-point
+      \item Auto-downloads CSV at end
     \end{itemize}
     \column{0.45\textwidth}
     \centering
@@ -507,19 +478,18 @@
 \begin{frame}{The Automated Workflow}
   \begin{columns}[T]
     \column{0.48\textwidth}
-    \textbf{Student steps (all of them):}
     \begin{enumerate}
-      \item Plug in ESP32 via USB
-      \item Double-click \textit{HEATSINK TESTER} shortcut
-      \item Select COM port → click Connect
-      \item Type heatsink ID (e.g.\ \texttt{HS-01-fin-array})
+      \item Plug in ESP32
+      \item Open \textit{HEATSINK TESTER}
+      \item Select port → Connect
+      \item Type heatsink ID
       \item Press \alert{Start Test}
-      \item \textbf{Wait} — system steps through all temperatures automatically
-      \item Results CSV downloads automatically when complete
-      \item Swap heatsink → repeat from step 4
+      \item \textbf{Wait} — runs automatically
+      \item CSV downloads on completion
+      \item Swap heatsink → repeat
     \end{enumerate}
-    \vspace{0.2em}
-    \textit{Students never need to know what PID is.}
+    \vspace{0.3em}
+    \textit{No PID knowledge needed.}
     \column{0.5\textwidth}
     \centering
     \includegraphics[width=0.48\linewidth, height=3cm, keepaspectratio]{sw-05.png}\hfill
@@ -562,12 +532,11 @@
     \footnotesize\textit{Representative values — illustrate output format.}
     \column{0.47\textwidth}
     \vspace{0.3em}
-    \textbf{Key observations:}
+    \textbf{Observations:}
     \begin{itemize}
-      \item $R_{th}$ is \alert{consistent across set-points} for each heatsink — confirms steady-state measurement quality
-      \item \textbf{Finned aluminium (HS-01) outperforms solid copper (HS-02)} despite copper's higher conductivity: fins provide far more convective surface area
-      \item HS-01 needs \textbf{more power} to hold the same temperature — more heat is being removed by the airflow, so the heater has to work harder
-      \item Platform \alert{clearly distinguishes} the two samples: 2.4 vs 4.0\,°C/W
+      \item $R_{th}$ \alert{consistent across set-points}
+      \item Finned aluminium $>$ solid copper
+      \item Platform clearly separates them:\\ \alert{2.4 vs 4.0\,°C/W}
     \end{itemize}
   \end{columns}
   \note{These are representative values that illustrate the format of the output.
@@ -588,30 +557,22 @@
 \begin{frame}{Safety: Heater Shutdown}
   \begin{columns}[T]
     \column{0.55\textwidth}
-    \textbf{Three tested termination paths — all verified:}
+    \textbf{\texttt{SET RUN OFF} on every exit path:}
     \begin{enumerate}
-      \item \textbf{Normal test completion}\\
-            Backend sends \texttt{SET RUN OFF} automatically after the last set-point.
-            GUI displays \textit{"Test complete — heater off"}.
-      \vspace{0.4em}
-      \item \textbf{Manual Stop button}\\
-            Immediately sends \texttt{SET RUN OFF}.
-            Heater power drops to zero within one firmware cycle.
-      \vspace{0.4em}
-      \item \textbf{Browser close / network disconnect}\\
-            Backend detects WebSocket disconnection and sends \texttt{SET RUN OFF} as a fallback.
+      \item Normal completion
+      \vspace{0.3em}
+      \item Manual Stop button
+      \vspace{0.3em}
+      \item Browser close / disconnect
     \end{enumerate}
-    \vspace{0.4em}
-    \alert{In all three cases: INA226 power reading returned to zero.}
+    \vspace{0.8em}
+    \alert{All verified: INA226 power → 0.}
     \column{0.42\textwidth}
     \vspace{0.5em}
-    \textbf{Why this matters:}\\[0.3em]
-    A heater left on unattended in a lab is a genuine fire and burn risk.
-    Requiring a student to manually cut power after the test means relying on
-    a human action that can be forgotten.\\[0.5em]
-    \textbf{Automatic shutdown on every exit path} removes that dependency entirely.\\[0.5em]
-    Additionally: a 60-second cool-down at low fan speed runs before the fan stops,
-    reducing thermal stress on components.
+    \textbf{Why it matters:}\\[0.3em]
+    Unattended heater = fire / burn risk.\\[0.5em]
+    Automatic shutdown removes reliance on the student.\\[0.5em]
+    + 60\,s fan cool-down before stop.
   \end{columns}
   \note{Safety was requirement R5 and I treated it as P0 — the highest priority.
   A live heater element in a teaching lab is a real hazard. I tested three ways the
@@ -632,21 +593,21 @@
 \begin{frame}{Limitations \& Future Work}
   \begin{columns}[T]
     \column{0.5\textwidth}
-    \textbf{Current limitations:}
+    \textbf{Limitations:}
     \begin{itemize}
-      \item \textbf{Airspeed commanded, not measured} — fan \% assumes reproducible fan curve; real m/s unknown
-      \item \textbf{No independent hardware safety watchdog} — safety relies on firmware + backend logic; a separate MCU with its own power cut would be more robust
-      \item \textbf{Single thermocouple} — no independent ambient sensor; T\_amb estimated manually
-      \item \textbf{No formal repeatability study} — functional validation only; uncertainty budget not quantified
+      \item Airspeed commanded, not measured
+      \item No hardware safety watchdog
+      \item Single thermocouple
+      \item No formal repeatability study
     \end{itemize}
     \column{0.47\textwidth}
-    \textbf{Highest-priority next steps:}
+    \textbf{Next steps:}
     \begin{enumerate}
-      \item Wire the \textbf{anemometer} and \textbf{SDP510 pressure sensor} — already provisioned in the telemetry schema and CSV; enables closed-loop airspeed control
-      \item Add an \textbf{independent hardware watchdog MCU} with a power-cut relay
-      \item Run a structured \textbf{repeatability study} on reference heatsinks
-      \item Record \textbf{ambient temperature and humidity} per run (EZO-HUM already wired)
-      \item Packaged \textbf{one-click installer} for lab deployment
+      \item Wire anemometer + SDP510
+      \item Hardware watchdog MCU
+      \item Repeatability study
+      \item Log ambient T + humidity
+      \item One-click installer
     \end{enumerate}
   \end{columns}
   \note{Every system has limitations and this one is no different. The most significant
@@ -674,12 +635,12 @@
       \textcolor{green!60!black}{\textbf{RQ3}} & One button; shutdown on all exit paths \\[0.2em]
       \textcolor{green!60!black}{\textbf{RQ4}} & Platform distinguishes heatsinks clearly \\
     \end{tabular}
-    \vspace{0.6em}
-    \textbf{Key contributions:}
+    \vspace{0.8em}
+    \textbf{Contributions:}
     \begin{itemize}
-      \item Robust, safe, genuinely usable lab automation system
-      \item \textbf{Software-first architecture}: firmware locked, all features in backend + frontend — rapid iteration, hardware unchanged from first prototype to final build
-      \item Any engineering student can characterise a heatsink \alert{without knowing what PID is}
+      \item Safe, usable lab automation
+      \item \textbf{Software-first}: firmware locked
+      \item Usable \alert{without knowing PID}
     \end{itemize}
     \column{0.42\textwidth}
     \centering
