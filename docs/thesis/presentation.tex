@@ -34,10 +34,11 @@
 \usetikzlibrary{positioning,arrows.meta}
 \usepackage{pgfpages}
 
-%% ---- Speaker notes layout ----------------------------------
-%% Comment out the next two lines to get slides-only PDF
-\setbeameroption{show notes on second screen=right}
-\setbeamertemplate{note page}{\pagecolor{yellow!10}\insertnote}
+%% ---- Speaker notes ------------------------------------------
+%% Notes live in a separate document (presentation-notes.pdf).
+%% This file produces SLIDES ONLY. The \note{} blocks below are
+%% kept as the source of truth and are simply not rendered here.
+\setbeameroption{hide notes}
 
 %% ---- Image path --------------------------------------------
 \graphicspath{{../media/guide/}}
