@@ -517,6 +517,11 @@
         <div class="live-stat-value good" id="lRth">–</div>
         <div class="live-stat-unit">°C/W</div>
       </div>
+      <div class="live-stat">
+        <div class="live-stat-label">ΔP1</div>
+        <div class="live-stat-value" id="lDeltaP1">–</div>
+        <div class="live-stat-unit">Pa</div>
+      </div>
     </div>
 
     <!-- Chart -->
@@ -1237,7 +1242,8 @@ function updateLiveStats(d) {
   const amb  = parseFloat(document.getElementById('ambientTemp').value) || 20;
   const dT   = (d.smooth ?? 0) - amb;
   const r_th = (d.power_w > 0.05 && dT > 2) ? dT / d.power_w : null;
-  document.getElementById('lRth').textContent = r_th != null ? r_th.toFixed(3) : '–';
+  document.getElementById('lRth').textContent      = r_th != null ? r_th.toFixed(3) : '–';
+  document.getElementById('lDeltaP1').textContent  = f(d.delta_p1f, 1);
 }
 
 function addTempGroupHeader(sp) {
