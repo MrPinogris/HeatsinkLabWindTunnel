@@ -596,12 +596,14 @@ let chartMarkers = [];
 
 // ─── Chart setup ──────────────────────────────────────────────────────────────
 const SERIES = [
-  { key: 'smooth',     label: 'Temperature (°C)',  color: '#34d399', yAxis: 'y',  on: true  },
-  { key: 'sp',         label: 'Setpoint (°C)',      color: '#f97316', yAxis: 'y',  on: true  },
-  { key: 'power_w',    label: 'Power (W)',           color: '#fde047', yAxis: 'y2', on: false },
-  { key: 'eq_pwm',     label: 'Eq. PWM',             color: '#f43f5e', yAxis: 'y2', on: false },
-  { key: 'fan_speed',  label: 'Fan Speed (%)',        color: '#22d3ee', yAxis: 'y2', on: false },
-  { key: 'enter_prog', label: 'SMART Progress (%)',   color: '#a3e635', yAxis: 'y2', on: false },
+  { key: 'smooth',     label: 'Temperature (°C)',   color: '#34d399', yAxis: 'y',  on: true  },
+  { key: 'sp',         label: 'Setpoint (°C)',       color: '#f97316', yAxis: 'y',  on: true  },
+  { key: 'power_w',    label: 'Power (W)',            color: '#fde047', yAxis: 'y2', on: false },
+  { key: 'eq_pwm',     label: 'Eq. PWM',              color: '#f43f5e', yAxis: 'y2', on: false },
+  { key: 'fan_speed',  label: 'Fan Speed (%)',         color: '#22d3ee', yAxis: 'y2', on: false },
+  { key: 'enter_prog', label: 'SMART Progress (%)',    color: '#a3e635', yAxis: 'y2', on: false },
+  { key: 'delta_p1f',  label: 'ΔP1 Filtered (Pa)',    color: '#fb923c', yAxis: 'y3', on: false },
+  { key: 'delta_p2f',  label: 'ΔP2 Filtered (Pa)',    color: '#c084fc', yAxis: 'y3', on: false },
 ];
 
 const cDatasets = SERIES.map(s => ({
@@ -690,6 +692,13 @@ function initChart() {
           grid: { drawOnChartArea: false },
           display: 'auto',
         },
+        y3: {
+          position: 'right',
+          title: { display: true, text: 'Pressure [Pa]', color: '#fb923c' },
+          ticks: { color: '#fb923c' },
+          grid: { drawOnChartArea: false },
+          display: 'auto',
+        },
       }
     }
   });
@@ -730,7 +739,8 @@ function pushChartPoint(d) {
   const t = d.ts - base;
   const vals = {
     smooth: d.smooth, sp: d.sp, power_w: d.power_w,
-    eq_pwm: d.eq_pwm, fan_speed: d.fan_speed, enter_prog: d.enter_prog
+    eq_pwm: d.eq_pwm, fan_speed: d.fan_speed, enter_prog: d.enter_prog,
+    delta_p1f: d.delta_p1f, delta_p2f: d.delta_p2f,
   };
   SERIES.forEach((s, i) => {
     const v = vals[s.key];

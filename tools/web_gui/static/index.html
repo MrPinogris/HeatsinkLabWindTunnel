@@ -2110,8 +2110,8 @@ function enterTesterMode() {
   // Mirror Run ID / Heatsink from sidebar into tester inputs
   document.getElementById('tRunId').value = document.getElementById('runId').value;
   document.getElementById('tHeatsinkId').value = document.getElementById('heatsinkId').value;
-  // Set tester-friendly series: show Smooth, SP, PWM, EqPWM, Power W, and pressure diff; hide others
-  const show = ['smooth','sp','pwm','eq_pwm','power_w','delta_p1f','delta_p2f'];
+  // Set tester-friendly series: show Smooth, SP, PWM, EqPWM, Power W; hide others
+  const show = ['smooth','sp','pwm','eq_pwm','power_w'];
   SERIES_CFG.forEach((s, i) => {
     chartDatasets[i].hidden = !show.includes(s.key);
   });
