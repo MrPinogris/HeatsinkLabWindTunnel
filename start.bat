@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0tools\web_gui"
 echo Installing dependencies (offline)...
 python -m pip install --no-index --find-links wheels -r requirements.txt
 if errorlevel 1 goto install_error
